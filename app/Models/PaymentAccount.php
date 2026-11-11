@@ -37,3 +37,4 @@ class PaymentAccount extends Model
         return $this->belongsTo(ChartOfAccount::class, 'chart_account_id');
     }
 }
+

@@ -48,3 +48,4 @@ class ChartOfAccount extends Model
         return $this->hasMany(PaymentAccount::class);
     }
 }
+

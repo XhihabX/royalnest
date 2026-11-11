@@ -35,3 +35,4 @@ class BusinessSetting extends Model
         );
     }
 }
+

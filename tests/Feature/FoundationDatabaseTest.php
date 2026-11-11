@@ -71,7 +71,7 @@ class FoundationDatabaseTest extends TestCase
 
         $journal = DB::transaction(function () use ($admin, $branch, $cashAcc, $capitalAcc) {
             $jrn = Journal::create([
-                'journal_no' => 'JRN-TEST-0001',
+                'journal_no' => 'JRN-TEST-' . uniqid(),
                 'branch_id' => $branch->id,
                 'business_date' => now()->toDateString(),
                 'transaction_date' => now()->toDateString(),
@@ -113,3 +113,4 @@ class FoundationDatabaseTest extends TestCase
         $this->assertEquals($journal->lines->sum('debit'), $journal->lines->sum('credit'));
     }
 }
+

@@ -28,3 +28,4 @@ class FiscalPeriod extends Model
         return $this->belongsTo(User::class, 'locked_by');
     }
 }
+

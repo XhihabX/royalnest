@@ -164,3 +164,4 @@ class RoyalNestFoundationSeeder extends Seeder
         }
     }
 }
+

@@ -39,3 +39,4 @@ class JournalLine extends Model
         return $this->belongsTo(Branch::class);
     }
 }
+

@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-11] — Phase 1: Menu Catalog, Multi-Tier Unit Conversions, Perpetual Stock Ledger & Recipe BOM
+
+**What:**
+1. **Multi-Tier Unit Conversion Matrix**:
+   - Created `units` and `unit_conversions` tables.
+   - Built `UnitConversionService` handling forward, reverse, and multi-hop conversions (`kg` <-> `g`, `L` <-> `ml`, `ctn_24` <-> `can`/`pcs`) with high-precision decimal math.
+2. **Perpetual Stock Ledger & Multi-Location Inventory**:
+   - Created `stock_locations` (Main Store, Kitchen Prep Station, Coffee & Beverage Bar), `stock_items`, `stock_location_quantities`, `stock_batches`, and `stock_movements`.
+   - Built `StockMovementService` enforcing atomic transactions, moving weighted-average cost calculation on goods receipt, location tracking, and First-Expiry-First-Out (FEFO) batch deductions.
+3. **Menu Catalog & Product Engine**:
+   - Created `menu_categories`, `menu_items`, `menu_item_variants`, and `menu_modifiers`.
+   - Added kitchen station routing (`kitchen`, `grill`, `bar`, `dessert`) and Bangladesh 15% VAT support.
+4. **Recipe & Bill of Materials (BOM) Costing Engine**:
+   - Created `recipes`, `recipe_versions`, and `recipe_lines`.
+   - Built `RecipeCostingService` traversing raw ingredients and nested sub-recipes, factoring in trim waste % and usable yields, calculating theoretical dish costs, food cost %, and suggested target-margin selling prices.
+   - Guarded against circular sub-recipe recursion with cycle detection.
+5. **Interactive Vue 3 Frontend Pages**:
+   - Created responsive dark/slate theme `AppLayout.vue`.
+   - Built `/menu` (`Menu/Index.vue`), `/recipes` (`Recipes/Index.vue`), and `/inventory` (`Inventory/Index.vue`).
+   - Verified clean production Vite asset build (`npm run build`).
+6. **Automated Test Suite**:
+   - Authored `RecipeAndInventoryTest.php` and `MenuAndInventoryWebTest.php`.
+   - Verified 14 automated tests (85 assertions) running 100% green on MySQL 8.4 engine.
+
+**Why:** Fulfill PRD Sections 5.4, 5.6, and 5.7, establishing the essential restaurant domain logic required for food portion costing, ingredient inventory deductions, and POS ordering.
+**How:** Implemented relational migrations, Eloquent models, business services, seeders, and Vue components.
+**Where:** `royal-nest/database/*`, `royal-nest/app/*`, `royal-nest/resources/js/*`, `royal-nest/tests/*`, `royal-nest/docs/*`.
+**Impact:** Zero impact on Saba POS; complete Menu, Unit, Stock Ledger, and Recipe BOM operational in `royal-nest`.
+
+---
+
 ## [2026-11-11] — Phase 0: Complete Foundation, Double-Entry GL, RBAC & Subfolder Isolation
 
 **What:**
