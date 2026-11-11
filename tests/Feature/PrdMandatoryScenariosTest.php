@@ -172,19 +172,18 @@ class PrdMandatoryScenariosTest extends TestCase
     }
 
     /**
-     * Scenario 3: Moving Weighted-Average Costing Formula (PRD Section 12).
-     * Existing: 10 kg @ ৳100/kg = ৳1,000.
-     * New purchase: 10 kg @ ৳120/kg = ৳1,200.
-     * Total: 20 kg worth ৳2,200 -> Average cost = ৳110/kg.
-     * If 5 kg is consumed -> consumption cost = ৳550, ending stock = 15 kg.
+     * Scenario 3: FIFO (First-In, First-Out) Batch Costing Engine.
+     * Previous stock retains its purchase price (10 kg @ ৳100 in Batch 1).
+     * Future stock retains its own purchase price (10 kg @ ৳120 in Batch 2).
+     * Consuming 5 kg consumes from Batch 1 at ৳100/kg -> cost = ৳500 (NOT blended ৳550!).
+     * Consuming another 7 kg spans 5 kg from Batch 1 @ ৳100 + 2 kg from Batch 2 @ ৳120 -> cost = ৳740.
      */
-    public function test_scenario_3_moving_weighted_average_cost_calculation(): void
+    public function test_scenario_3_fifo_batch_cost_calculation(): void
     {
         $beef = $this->createProduct('Beef', 'kg', 'kg', 1.0, 10.0, 100.00);
         $this->assertEquals(10.0, (float)$beef->current_stock);
-        $this->assertEquals(100.00, (float)$beef->cost_price);
 
-        // Purchase another 10 kg @ ৳120
+        // Purchase another 10 kg @ ৳120 (Batch 2)
         $this->purchaseService->confirmPurchase([
             'purchase_date' => '2026-11-12',
         ], [
@@ -198,10 +197,15 @@ class PrdMandatoryScenariosTest extends TestCase
 
         $beef->refresh();
         $this->assertEquals(20.0, (float)$beef->current_stock);
-        $this->assertEquals(110.00, (float)$beef->cost_price);
 
-        // Consume 5 kg
-        $consumption = $this->consumptionService->recordConsumption('2026-11-12', [
+        // Verify two distinct batches exist
+        $batches = $beef->activeBatches()->get();
+        $this->assertCount(2, $batches);
+        $this->assertEquals(100.00, (float)$batches[0]->unit_cost);
+        $this->assertEquals(120.00, (float)$batches[1]->unit_cost);
+
+        // 1. Consume 5 kg: FIFO must take from the older Batch 1 @ ৳100/kg
+        $consumption1 = $this->consumptionService->recordConsumption('2026-11-12', [
             [
                 'product_id' => $beef->id,
                 'quantity_used' => 5.0,
@@ -210,7 +214,27 @@ class PrdMandatoryScenariosTest extends TestCase
 
         $beef->refresh();
         $this->assertEquals(15.0, (float)$beef->current_stock);
-        $this->assertEquals(550.00, (float)$consumption->total_cost);
+        // Cost is 5kg * ৳100 = ৳500 (NOT ৳550)
+        $this->assertEquals(500.00, (float)$consumption1->total_cost);
+
+        // 2. Consume another 7 kg: takes remaining 5 kg of Batch 1 @ ৳100 + 2 kg of Batch 2 @ ৳120
+        $consumption2 = $this->consumptionService->recordConsumption('2026-11-12', [
+            [
+                'product_id' => $beef->id,
+                'quantity_used' => 7.0,
+            ]
+        ], $this->user->id);
+
+        $beef->refresh();
+        $this->assertEquals(8.0, (float)$beef->current_stock);
+        // Cost is (5 * 100) + (2 * 120) = 500 + 240 = ৳740
+        $this->assertEquals(740.00, (float)$consumption2->total_cost);
+
+        // Batch 1 is exhausted; Batch 2 has 8 kg remaining
+        $this->assertCount(1, $beef->activeBatches()->get());
+        $remainingBatch = $beef->activeBatches()->first();
+        $this->assertEquals(8.0, (float)$remainingBatch->remaining_quantity);
+        $this->assertEquals(120.00, (float)$remainingBatch->unit_cost);
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductUnitConversion;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
+use App\Models\StockBatch;
 use App\Models\Supplier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -21,8 +22,8 @@ class PurchaseService
     ) {}
 
     /**
-     * Confirm a purchase invoice, convert units to base unit, update perpetual stock ledger,
-     * and handle the direct "Purchase & Consume" workflow if enabled.
+     * Confirm a purchase invoice, convert units to base unit, create FIFO stock batch,
+     * update perpetual stock ledger, and handle the direct "Purchase & Consume" workflow if enabled.
      */
     public function confirmPurchase(array $purchaseData, array $items, int $userId): Purchase
     {
@@ -101,11 +102,11 @@ class PurchaseService
                 ]);
             }
 
-            // 3. Create items and post to Stock Ledger
+            // 3. Create items, create FIFO StockBatches, and post to Stock Ledger
             foreach ($processedItems as $pItem) {
                 $product = $pItem['product'];
 
-                PurchaseItem::create([
+                $purchaseItem = PurchaseItem::create([
                     'purchase_id' => $purchase->id,
                     'product_id' => $product->id,
                     'purchase_quantity' => $pItem['purchase_quantity'],
@@ -115,6 +116,17 @@ class PurchaseService
                     'base_quantity' => $pItem['base_quantity'],
                     'base_unit_cost' => $pItem['base_unit_cost'],
                 ]);
+
+                // Create independent FIFO StockBatch for this purchase line
+                $batchNo = 'BATCH-' . $purchase->purchase_date->format('Ymd') . '-' . $purchaseItem->id;
+                $batch = $this->stockLedgerService->createBatch(
+                    product: $product,
+                    quantity: $pItem['base_quantity'],
+                    unitCost: $pItem['base_unit_cost'],
+                    receivedDate: $purchase->purchase_date->toDateString(),
+                    purchaseItemId: $purchaseItem->id,
+                    batchNo: $batchNo
+                );
 
                 // Movement 1: Stock Receipt (+Q)
                 $this->stockLedgerService->recordMovement(
@@ -127,11 +139,18 @@ class PurchaseService
                     referenceType: Purchase::class,
                     referenceId: $purchase->id,
                     userId: $userId,
-                    notes: "Purchase receipt for Inv #{$purchase->invoice_no}"
+                    notes: "Purchase receipt for Inv #{$purchase->invoice_no} ({$batchNo})",
+                    allowNegative: false,
+                    stockBatchId: $batch->id
                 );
 
                 // Movement 2: If Direct Purchase & Consume (-Q)
                 if ($isPurchaseAndConsume) {
+                    // Exhaust this specific batch immediately
+                    $batch->remaining_quantity = 0.0000;
+                    $batch->is_exhausted = true;
+                    $batch->save();
+
                     $this->stockLedgerService->recordMovement(
                         product: $product,
                         movementType: 'consumption',
@@ -142,12 +161,15 @@ class PurchaseService
                         referenceType: Purchase::class,
                         referenceId: $purchase->id,
                         userId: $userId,
-                        notes: "Immediate consumption for Inv #{$purchase->invoice_no}"
+                        notes: "Immediate consumption for Inv #{$purchase->invoice_no} ({$batchNo})",
+                        allowNegative: false,
+                        stockBatchId: $batch->id
                     );
 
                     ConsumptionItem::create([
                         'consumption_id' => $consumption->id,
                         'product_id' => $product->id,
+                        'stock_batch_id' => $batch->id,
                         'quantity_used' => $pItem['base_quantity'],
                         'unit_cost' => $pItem['base_unit_cost'],
                         'total_cost' => $pItem['subtotal'],
@@ -179,4 +201,3 @@ class PurchaseService
         });
     }
 }
-

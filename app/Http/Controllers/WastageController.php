@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\StockBatch;
 use App\Models\Wastage;
 use App\Services\StockLedgerService;
 use Illuminate\Http\RedirectResponse;
@@ -43,8 +44,27 @@ class WastageController extends Controller
 
         $product = Product::findOrFail($validated['product_id']);
         $quantity = (float)$validated['quantity'];
-        $unitCost = (float)$product->cost_price;
+
+        // Determine exact unit cost from oldest active FIFO batch
+        $batch = StockBatch::where('product_id', $product->id)
+            ->where('is_exhausted', false)
+            ->where('remaining_quantity', '>', 0)
+            ->orderBy('received_date', 'asc')
+            ->orderBy('id', 'asc')
+            ->first();
+
+        $unitCost = $batch ? (float)$batch->unit_cost : (float)$product->cost_price;
         $totalCost = round($quantity * $unitCost, 2);
+
+        if ($batch) {
+            $rem = (float)$batch->remaining_quantity;
+            $batch->remaining_quantity = max(0, round($rem - $quantity, 4));
+            if ($batch->remaining_quantity <= 0) {
+                $batch->remaining_quantity = 0.0000;
+                $batch->is_exhausted = true;
+            }
+            $batch->save();
+        }
 
         $wastage = Wastage::create([
             'product_id' => $product->id,
@@ -67,7 +87,9 @@ class WastageController extends Controller
             referenceType: Wastage::class,
             referenceId: $wastage->id,
             userId: auth()->id() ?: 1,
-            notes: "Wastage: {$validated['reason']}"
+            notes: "Wastage: {$validated['reason']}" . ($batch ? " (Batch {$batch->batch_no})" : ""),
+            allowNegative: false,
+            stockBatchId: $batch?->id
         );
 
         return redirect()->back()->with('success', 'Wastage recorded and deducted from stock ledger.');

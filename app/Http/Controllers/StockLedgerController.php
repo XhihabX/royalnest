@@ -12,7 +12,7 @@ class StockLedgerController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = StockLedger::with(['product', 'user']);
+        $query = StockLedger::with(['product', 'user', 'stockBatch']);
 
         if ($request->filled('product_id')) {
             $query->where('product_id', $request->input('product_id'));

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Models\StockBatch;
 use App\Models\StockLedger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -10,7 +11,32 @@ use Illuminate\Validation\ValidationException;
 class StockLedgerService
 {
     /**
-     * Record an immutable perpetual stock ledger entry and update product inventory & valuation.
+     * Create a new purchase or opening stock batch.
+     */
+    public function createBatch(
+        Product $product,
+        float $quantity,
+        float $unitCost,
+        string $receivedDate,
+        ?int $purchaseItemId = null,
+        ?string $batchNo = null
+    ): StockBatch {
+        $bNo = $batchNo ?: ('BATCH-' . date('Ymd', strtotime($receivedDate)) . '-' . strtoupper(substr(uniqid(), -5)));
+
+        return StockBatch::create([
+            'product_id' => $product->id,
+            'purchase_item_id' => $purchaseItemId,
+            'batch_no' => $bNo,
+            'received_date' => $receivedDate,
+            'initial_quantity' => round($quantity, 4),
+            'remaining_quantity' => round($quantity, 4),
+            'unit_cost' => round($unitCost, 4),
+            'is_exhausted' => false,
+        ]);
+    }
+
+    /**
+     * Record an immutable perpetual stock ledger entry and update product inventory.
      *
      * @throws ValidationException
      */
@@ -25,7 +51,8 @@ class StockLedgerService
         ?int $referenceId = null,
         ?int $userId = null,
         ?string $notes = null,
-        bool $allowNegative = false
+        bool $allowNegative = false,
+        ?int $stockBatchId = null
     ): StockLedger {
         return DB::transaction(function () use (
             $product,
@@ -38,7 +65,8 @@ class StockLedgerService
             $referenceId,
             $userId,
             $notes,
-            $allowNegative
+            $allowNegative,
+            $stockBatchId
         ) {
             // Lock product record for update to prevent race conditions
             $prod = Product::lockForUpdate()->findOrFail($product->id);
@@ -52,20 +80,17 @@ class StockLedgerService
                 }
             }
 
-            // 2. Calculate moving weighted-average cost on stock additions (purchase receipt, opening stock)
-            if ($quantityIn > 0 && in_array($movementType, ['purchase_receipt', 'opening_stock', 'adjustment_in'])) {
-                if ((float)$prod->current_stock <= 0) {
-                    $prod->cost_price = round($unitCost, 4);
-                } else {
-                    $currentVal = (float)$prod->current_stock * (float)$prod->cost_price;
-                    $incomingVal = (float)$quantityIn * (float)$unitCost;
-                    $totalQty = (float)$prod->current_stock + (float)$quantityIn;
-                    $prod->cost_price = round(($currentVal + $incomingVal) / $totalQty, 4);
-                }
+            // 2. Handle batch creation for opening stock if not passed
+            $resolvedBatchId = $stockBatchId;
+            if ($quantityIn > 0 && $movementType === 'opening_stock' && !$resolvedBatchId) {
+                $batch = $this->createBatch($prod, $quantityIn, $unitCost, $transactionDate, null, 'OPENING-' . date('Ymd', strtotime($transactionDate)));
+                $resolvedBatchId = $batch->id;
             }
 
-            // If unitCost passed is 0 for outgoing movements, use current moving average cost
-            $effectiveUnitCost = $unitCost > 0 ? $unitCost : (float)$prod->cost_price;
+            // Reference cost: in FIFO, product cost_price stores the unit_cost of incoming or active oldest batch
+            if ($unitCost > 0) {
+                $prod->cost_price = round($unitCost, 4);
+            }
 
             // 3. Calculate new stock balance
             $newBalance = round((float)$prod->current_stock + (float)$quantityIn - (float)$quantityOut, 4);
@@ -74,16 +99,17 @@ class StockLedgerService
 
             // 4. Create immutable stock ledger entry
             $movementQty = $quantityIn > 0 ? $quantityIn : $quantityOut;
-            $totalValue = round($movementQty * $effectiveUnitCost, 2);
+            $totalValue = round($movementQty * $unitCost, 2);
 
             return StockLedger::create([
                 'product_id' => $prod->id,
+                'stock_batch_id' => $resolvedBatchId,
                 'movement_type' => $movementType,
                 'transaction_date' => $transactionDate,
                 'quantity_in' => round($quantityIn, 4),
                 'quantity_out' => round($quantityOut, 4),
                 'balance_after' => $newBalance,
-                'unit_cost' => round($effectiveUnitCost, 4),
+                'unit_cost' => round($unitCost, 4),
                 'total_value' => $totalValue,
                 'reference_type' => $referenceType,
                 'reference_id' => $referenceId,
@@ -94,4 +120,3 @@ class StockLedgerService
         });
     }
 }
-

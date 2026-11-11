@@ -7,7 +7,7 @@
 Royal Nest Café & Restaurant is a dedicated financial and inventory management system designed to track:
 - Daily sales and payment method reconciliation (Cash, bKash, Nagad, Card/Bank).
 - Raw materials and consumable inventory under a **Perpetual Inventory System**.
-- Goods receiving with configurable product-specific unit conversions and **Moving Weighted-Average Costing**.
+- Goods receiving with configurable product-specific unit conversions and **FIFO (First-In, First-Out) Batch Costing** (previous stock retains its exact historical purchase price, future stock retains its own price, and consumption automatically deducts from the oldest purchase batch first).
 - Actual end-of-day kitchen ingredient consumption with **Negative Stock Prevention**.
 - Direct **Purchase & Consume** atomic workflow (stock receipt $+Q$ and consumption $-Q$, 0 ending stock, 0 duplicate expense).
 - Multi-day **Consumables Cost Allocation** (amortizing items like ৳120 tissue box over 4 days = ৳30/day without upfront P&L expense spikes).
@@ -37,12 +37,13 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
 2. **Products & Unit Conversions**:
    - `categories`: Classified into `raw_material`, `consumable`, `other_stock`.
    - `suppliers`: Supplier directory with current payable balances.
-   - `products`: Product master storing `current_stock` and `cost_price` (moving weighted-average) always in `base_unit` (`g`, `kg`, `ml`, `L`, `pcs`).
+   - `products`: Product master storing `current_stock` and latest `cost_price` always in `base_unit` (`g`, `kg`, `ml`, `L`, `pcs`).
    - `product_unit_conversions`: Product-specific conversion matrix (e.g. 1 sack = 25 kg, 1 kg = 1000 g).
-3. **Perpetual Stock Ledger & Movements**:
+3. **Perpetual Stock Ledger & FIFO Batches**:
+   - `stock_batches`: Discrete purchase lots (`batch_no`, `received_date`, `initial_quantity`, `remaining_quantity`, `unit_cost`, `is_exhausted`).
    - `purchases` & `purchase_items`: Confirmed stock receipts and direct Purchase & Consume transactions.
-   - `stock_ledger`: Immutable chronological movement log (`opening_stock`, `purchase_receipt`, `consumption`, `wastage`, `adjustment_in`, `adjustment_out`, `purchase_return`). Never overwrites previous rows.
-   - `consumptions` & `consumption_items`: Daily ingredient actual usage records.
+   - `stock_ledger`: Immutable chronological movement log (`opening_stock`, `purchase_receipt`, `consumption`, `wastage`, `adjustment_in`, `adjustment_out`, `purchase_return`) linked to specific `stock_batch_id`. Never overwrites previous rows.
+   - `consumptions` & `consumption_items`: Daily ingredient actual usage records linked to specific `stock_batch_id`.
    - `consumable_allocations`: Multi-day consumable amortized allocation schedules.
    - `wastages`: Spoilage, burnt, or expired item records with reasons.
    - `stock_counts` & `stock_count_items`: Physical count vs system balance with discrepancy tracking.
@@ -62,17 +63,18 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
 - `StockLedgerService`:
   - Enforces atomic database locks (`Product::lockForUpdate()`).
   - Guards against negative stock by default (`ValidationException`).
-  - Recalculates moving weighted-average cost on stock additions:
-    $$\text{New Cost} = \frac{(\text{Current Qty} \times \text{Current Cost}) + (\text{Incoming Qty} \times \text{Incoming Cost})}{\text{Current Qty} + \text{Incoming Qty}}$$
-  - Appends immutable `StockLedger` movements.
+  - Manages `StockBatch` creation on purchase receipts and opening stock.
+  - Appends immutable `StockLedger` movements with batch traceability.
 - `PurchaseService`:
   - Converts purchased units to base units via product-specific multipliers.
+  - Generates discrete `StockBatch` for every purchase line.
   - Posts stock receipt movement to ledger.
-  - Handles the direct **Purchase & Consume** workflow: immediately executes a linked consumption movement of the same quantity, resulting in 0 remaining stock and 1 single consumption cost in P&L.
+  - Handles the direct **Purchase & Consume** workflow: immediately executes a linked consumption movement from the newly created batch, resulting in 0 remaining stock and 1 single consumption cost in P&L.
   - Updates supplier payable liability and deducts payments from financial accounts.
-- `ConsumptionService`:
-  - Validates stock availability for every ingredient.
-  - Deducts quantity from on-hand stock and writes consumption records to `stock_ledger` and `consumption_items`.
+- `ConsumptionService` (Automatic FIFO Dispatch):
+  - Validates total available stock across all active batches.
+  - Sequentially consumes from the oldest available `StockBatch` (`received_date ASC, id ASC`) until the requested quantity is satisfied.
+  - If a consumption spans multiple batches, slices the movement accurately in `stock_ledger` and `consumption_items` at each batch's exact historical cost.
 - `ConsumableAllocationService`:
   - Amortizes multi-day items (e.g. ৳120 tissue over 4 days = ৳30/day) and provides daily recognized amortization.
 - `FinancialAccountService`:
@@ -91,11 +93,11 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
 All routes render Vue 3 components via Inertia.js with Tailwind CSS v4:
 - `/`: Executive Dashboard (`Dashboard.vue`)
 - `/sales`: Daily Sales Entry & Breakdown (`Sales/Daily.vue`)
-- `/products`: Inventory Products & Conversions (`Products/Index.vue`)
+- `/products`: Inventory Products, Active FIFO Batches & Valuation (`Products/Index.vue`)
 - `/purchases`: Stock Receiving & Purchase & Consume (`Purchases/Index.vue`)
 - `/consumption`: End-of-Day Usage Entry (`Consumption/Index.vue`)
 - `/consumables`: Amortization Scheduler (`Consumables/Index.vue`)
-- `/ledger`: Perpetual Stock Movement Ledger (`Ledger/Index.vue`)
+- `/ledger`: Perpetual Stock Movement Ledger with Batch Tags (`Ledger/Index.vue`)
 - `/expenses`: Operating Expenses Categorization (`Expenses/Index.vue`)
 - `/wastage`: Spoilage & Wastage Entry (`Wastage/Index.vue`)
 - `/stock-counts`: Physical Stock Count Audit (`StockCounts/Index.vue`)
@@ -106,6 +108,6 @@ All routes render Vue 3 components via Inertia.js with Tailwind CSS v4:
 ---
 
 ## 6. Automated Verification Status
-- **Test Coverage**: 20 automated PHPUnit tests with 85 assertions running against native MySQL 8.4 engine (`royalnest_erp_test`), passing 100% green.
-- **PRD Scenarios Verified**: All 12 mandatory scenarios from PRD v1.1 Section 23 tested and verified in `tests/Feature/PrdMandatoryScenariosTest.php`.
-- **Frontend Compiler**: Vite 8 compiling 26 production bundles with zero errors.
+- **Test Coverage**: 20 automated PHPUnit tests with 91 assertions running against native MySQL 8.4 engine (`royalnest_erp_test`), passing 100% green.
+- **FIFO Verification**: Scenario 3 in `tests/Feature/PrdMandatoryScenariosTest.php` proves previous stock retains historical price (৳100/kg) and future purchases retain incoming price (৳120/kg), with sequential FIFO multi-batch consumption.
+- **Frontend Compiler**: Vite 8 compiling all production bundles with zero errors.

@@ -2,12 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-11] — Transition to FIFO (First-In, First-Out) Batch Costing Engine
+
+**What:**
+1. **FIFO Batch / Lot Database Schema**:
+   - Created `stock_batches` table tracking discrete purchase batches (`product_id`, `purchase_item_id`, `batch_no`, `received_date`, `initial_quantity`, `remaining_quantity`, `unit_cost`, `is_exhausted`).
+   - Added foreign key `stock_batch_id` to `stock_ledger` and `consumption_items`.
+2. **Batch Generation in Purchases & Opening Stock**:
+   - Updated `PurchaseService` and `StockLedgerService` to create a dedicated `StockBatch` for every incoming purchase item and initial opening stock, preserving the exact purchase price per base unit without price blending.
+3. **Automatic FIFO Dispatch Engine**:
+   - Upgraded `ConsumptionService` with an automatic FIFO traversal algorithm: orders active batches chronologically (`received_date ASC, id ASC`) and deducts from the oldest available batch first until exhausted.
+   - Slices multi-batch consumption entries cleanly in `stock_ledger` and `consumption_items` with exact batch cost tracking.
+4. **FIFO Wastage Deduction**:
+   - Updated `WastageController` to draw from oldest active FIFO batches so spoilage costs reflect the actual historical cost of the oldest batch.
+5. **Interactive Frontend Updates**:
+   - Updated `Products/Index.vue` with an "Active FIFO Batches (Price by Lot)" breakdown and exact batch inventory valuation.
+   - Updated `Ledger/Index.vue` displaying the batch tag on every stock movement line.
+   - Recompiled Vite production build (`npm run build`).
+6. **Automated Test Suite**:
+   - Updated Scenario 3 in `PrdMandatoryScenariosTest.php` to prove that previous stock retains its price (10 kg @ ৳100) and future stock retains its price (10 kg @ ৳120), consuming 5 kg @ ৳100 (৳500), and consuming 7 kg across both batches (৳740).
+   - All 20 tests (91 assertions) passing 100% green.
+
+**Why:** Replace moving weighted-average cost blending with First-In, First-Out (FIFO) lot costing as requested by user ("the previous ones will have their price and the future ones will have their price").
+**How:** Implemented relational migration `create_stock_batches_table`, `StockBatch` Eloquent model, FIFO traversal in `ConsumptionService`, UI enhancements, and updated PHPUnit test suite.
+**Where:** `royal-nest/database/migrations/*`, `royal-nest/app/*`, `royal-nest/resources/js/*`, `royal-nest/tests/*`, `royal-nest/docs/*`.
+**Impact:** Exact historical costing for Royal Nest; 100% zero interference with parent Saba POS project.
+
+---
+
 ## [2026-11-11] — Implementation of Royal Nest Cost, Inventory, Income & Profit Management System (PRD v1.1)
 
 **What:**
 1. **Perpetual Inventory Engine & Unit Conversions**:
    - Implemented relational database schema with `products`, `product_unit_conversions`, `stock_ledger`, `purchases`, `purchase_items`, `consumptions`, `consumption_items`, `consumable_allocations`, `wastages`, `stock_counts`, and `stock_count_items`.
-   - Created `StockLedgerService` enforcing atomic row locking (`lockForUpdate`), strict negative stock prevention, and moving weighted-average cost recalculation on all stock receipts.
+   - Created `StockLedgerService` enforcing atomic row locking (`lockForUpdate`), strict negative stock prevention, and perpetual movement recording on all stock receipts.
    - Built configurable product-specific unit conversions (e.g. 1 sack = 25 kg, 1 kg = 1000 g, 1 box = 1 pcs).
 2. **Purchase Receiving & Direct "Purchase & Consume" Workflow**:
    - Built `PurchaseService` supporting standard stock receipts as well as the specialized direct "Purchase & Consume" workflow (PRD Section 6), creating two linked movements (+Q receipt and -Q consumption) resulting in 0 ending stock and single consumption cost recognition with 0 duplicate expense.

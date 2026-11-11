@@ -15,6 +15,7 @@ class StockLedger extends Model
 
     protected $fillable = [
         'product_id',
+        'stock_batch_id',
         'movement_type',
         'transaction_date',
         'quantity_in',
@@ -42,6 +43,11 @@ class StockLedger extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function stockBatch(): BelongsTo
+    {
+        return $this->belongsTo(StockBatch::class);
     }
 
     public function user(): BelongsTo

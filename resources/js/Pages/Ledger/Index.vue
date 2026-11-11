@@ -127,7 +127,12 @@ const resetFilters = () => {
                     <tbody class="divide-y divide-slate-800/60">
                         <tr v-for="l in ledgers.data" :key="l.id" class="hover:bg-slate-800/30">
                             <td class="py-3 px-4 font-mono font-medium text-slate-300">{{ l.transaction_date }}</td>
-                            <td class="py-3 px-4 font-bold text-white">{{ l.product?.name }}</td>
+                            <td class="py-3 px-4">
+                                <span class="font-bold text-white block">{{ l.product?.name }}</span>
+                                <span v-if="l.stock_batch" class="text-[10px] font-mono text-amber-400">
+                                    {{ l.stock_batch.batch_no }}
+                                </span>
+                            </td>
                             <td class="py-3 px-4">
                                 <span 
                                     :class="[

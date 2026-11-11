@@ -13,6 +13,7 @@ class ConsumptionItem extends Model
     protected $fillable = [
         'consumption_id',
         'product_id',
+        'stock_batch_id',
         'quantity_used',
         'unit_cost',
         'total_cost',
@@ -33,6 +34,11 @@ class ConsumptionItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function stockBatch(): BelongsTo
+    {
+        return $this->belongsTo(StockBatch::class);
     }
 }
 

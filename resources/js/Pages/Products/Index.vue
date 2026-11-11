@@ -36,6 +36,15 @@ const openModal = () => {
     showModal.value = true;
 };
 
+const getFifoValuation = (product) => {
+    if (product.active_batches && product.active_batches.length > 0) {
+        return product.active_batches.reduce((sum, b) => {
+            return sum + (Number(b.remaining_quantity) * Number(b.unit_cost));
+        }, 0).toFixed(2);
+    }
+    return (Number(product.current_stock) * Number(product.cost_price)).toFixed(2);
+};
+
 const submit = () => {
     form.post('/products', {
         onSuccess: () => {
@@ -74,10 +83,9 @@ const submit = () => {
                             <th class="py-3 px-4">Category</th>
                             <th class="py-3 px-4">Base Unit</th>
                             <th class="py-3 px-4">Purchase Unit</th>
-                            <th class="py-3 px-4">Unit Conversion</th>
                             <th class="py-3 px-4 text-right">On-Hand Stock</th>
-                            <th class="py-3 px-4 text-right">Avg Cost / Base</th>
-                            <th class="py-3 px-4 text-right">Total Valuation</th>
+                            <th class="py-3 px-4">Active FIFO Batches (Price by Lot)</th>
+                            <th class="py-3 px-4 text-right">FIFO Inventory Value</th>
                             <th class="py-3 px-4 text-center">Status</th>
                         </tr>
                     </thead>
@@ -94,19 +102,25 @@ const submit = () => {
                             </td>
                             <td class="py-3 px-4 font-mono text-amber-300 font-bold">{{ p.base_unit }}</td>
                             <td class="py-3 px-4 font-mono text-slate-300">{{ p.purchase_unit }}</td>
-                            <td class="py-3 px-4 text-slate-400 font-mono text-[11px]">
-                                <span v-for="conv in p.unit_conversions" :key="conv.id">
-                                    1 {{ conv.purchase_unit }} = {{ Number(conv.multiplier_to_base) }} {{ p.base_unit }}
-                                </span>
-                            </td>
                             <td class="py-3 px-4 text-right font-mono font-bold" :class="Number(p.current_stock) <= Number(p.min_reorder_level) ? 'text-rose-400' : 'text-emerald-400'">
                                 {{ p.current_stock }} {{ p.base_unit }}
                             </td>
-                            <td class="py-3 px-4 text-right font-mono text-slate-300">
-                                ৳{{ Number(p.cost_price).toFixed(2) }}
+                            <td class="py-3 px-4">
+                                <div v-if="p.active_batches && p.active_batches.length > 0" class="flex flex-wrap gap-1">
+                                    <span 
+                                        v-for="b in p.active_batches" 
+                                        :key="b.id" 
+                                        class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-950 border border-slate-800 text-amber-300"
+                                    >
+                                        {{ b.remaining_quantity }} {{ p.base_unit }} @ ৳{{ Number(b.unit_cost).toFixed(2) }}
+                                    </span>
+                                </div>
+                                <span v-else class="text-slate-500 font-mono text-[11px]">
+                                    ৳{{ Number(p.cost_price).toFixed(2) }} / {{ p.base_unit }}
+                                </span>
                             </td>
                             <td class="py-3 px-4 text-right font-mono font-bold text-slate-200">
-                                ৳{{ (Number(p.current_stock) * Number(p.cost_price)).toFixed(2) }}
+                                ৳{{ getFifoValuation(p) }}
                             </td>
                             <td class="py-3 px-4 text-center">
                                 <span v-if="p.is_active" class="text-emerald-400 font-medium text-[11px]">Active</span>

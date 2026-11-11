@@ -20,7 +20,7 @@ class ProductController extends Controller
 
     public function index(): Response
     {
-        $products = Product::with(['category', 'supplier', 'unitConversions'])
+        $products = Product::with(['category', 'supplier', 'unitConversions', 'activeBatches'])
             ->orderBy('name')
             ->get();
 

@@ -75,5 +75,19 @@ class Product extends Model
     {
         return $this->hasMany(ConsumableAllocation::class);
     }
+
+    public function batches(): HasMany
+    {
+        return $this->hasMany(StockBatch::class);
+    }
+
+    public function activeBatches(): HasMany
+    {
+        return $this->hasMany(StockBatch::class)
+            ->where('is_exhausted', false)
+            ->where('remaining_quantity', '>', 0)
+            ->orderBy('received_date', 'asc')
+            ->orderBy('id', 'asc');
+    }
 }
 
