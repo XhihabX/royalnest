@@ -1,43 +1,111 @@
 # Royal Nest Café & Restaurant — Architecture & System Specification
+## Cost, Inventory, Income & Profit Management System (PRD v1.1)
 
-*This file describes the current state of the Royal Nest Restaurant ERP system. Update it in place whenever something changes — this is not a log, see CHANGELOG.md for history.*
+*This file describes the current state of the Royal Nest system. Update it in place whenever something changes — this is not a history, see CHANGELOG.md for history.*
 
-## Overview
-**Royal Nest Restaurant ERP Master** is an integrated, web-based restaurant operations, inventory, recipe costing, purchasing, and double-entry accounting management system built to PRD Version 2.0 specifications.
+## 1. Overview & Core Objective
+Royal Nest Café & Restaurant is a dedicated financial and inventory management system designed to track:
+- Daily sales and payment method reconciliation (Cash, bKash, Nagad, Card/Bank).
+- Raw materials and consumable inventory under a **Perpetual Inventory System**.
+- Goods receiving with configurable product-specific unit conversions and **Moving Weighted-Average Costing**.
+- Actual end-of-day kitchen ingredient consumption with **Negative Stock Prevention**.
+- Direct **Purchase & Consume** atomic workflow (stock receipt $+Q$ and consumption $-Q$, 0 ending stock, 0 duplicate expense).
+- Multi-day **Consumables Cost Allocation** (amortizing items like ৳120 tissue box over 4 days = ৳30/day without upfront P&L expense spikes).
+- Daily operating expenses (rent, gas, electricity, maintenance, etc.) kept strictly separate from inventory purchases.
+- Employee attendance, accrued salary costs vs actual cash payments (tracking unpaid payroll liabilities without double counting).
+- Financial accounts (Cash Drawer, bKash, Nagad, Bank) with neutral internal funds transfers.
+- Accurate **Daily, Monthly, and Date Range Profit & Loss Reports**.
 
-The platform links Front-of-House (Dine-In, Takeaway, Delivery, Table Management) with Kitchen Production (KDS, Station Routing), Purchasing (Requisitions, PO, GRN 3-Way Matching), Perpetual Inventory (BOM Recipe Explosions, Unit Conversions, Batch FEFO, Consumables Amortization), Staff Shifts & Payroll, and double-entry financial accounting.
+*Strict Boundaries*: As defined by PRD v1.1 Section 24, Kitchen Display System (KDS), dining table maps, delivery fleets, CRM, AI forecasting, and automatic recipe-based deductions are explicitly out of scope. Stock deduction is based strictly on manually entered actual usage.
 
-## Tech Stack
-- **Backend**: Laravel 11/12 (PHP 8.3+)
-- **Frontend**: Vue 3 (Composition API), Inertia.js, Tailwind CSS
-- **Database Engine**: MySQL 8.x (InnoDB transactional row locks, `DECIMAL(12, 4)` inventory precision, `DECIMAL(12, 2)` monetary values)
-- **Timezone & Locale**: BDT (`৳`), `Asia/Dhaka` timezone with restaurant `business_day` boundary support
-- **Compliance & Local Gateways**: NBR Mushak-6.3 tax invoicing, bKash / Nagad MFS counter verification & webhook auto-matching
+---
 
-## Folder Structure
-- `app/Http/Controllers/`: Backend controllers handling FOH, KDS, Inventory, Recipes, Procurement, Accounting, HR
-- `app/Models/`: Eloquent ORM models
-- `app/Services/`: Core business engines (`RecipeExplosionService`, `DoubleEntryLedgerService`, `StockMovementService`, `AuditLogger`)
-- `database/migrations/`: Relational schema definitions
-- `docs/`: Project documentation (`ARCHITECTURE.md`, `CHANGELOG.md`)
-- `resources/js/`: Vue 3 components, layouts, POS terminal, KDS screens, management dashboards
-- `routes/web.php`: Application route definitions
+## 2. Tech Stack & Environment
+- **Backend**: Laravel 12 (PHP 8.3.33)
+- **Frontend**: Vue 3 (Composition API), Inertia.js, Tailwind CSS v4, Lucide Icons
+- **Database Engine**: MySQL 8.4 (InnoDB transactions with row-level locks, `DECIMAL(12, 4)` inventory precision, `DECIMAL(12, 2)` monetary values)
+- **Timezone & Locale**: BDT (`৳`), `Asia/Dhaka` timezone
+- **Repository Isolation**: `d:\Projects\Saba POS\royal-nest` (completely isolated git repository, ignored by parent `.gitignore`)
 
-## Current Modules Status
-- **Foundation & Scaffold**: **Completed (Phase 0)**
-  - MySQL 8.4 engine active with dedicated databases: `royalnest_erp` and `royalnest_erp_test`
-  - Laravel 12 + Inertia.js + Vue 3 + Tailwind CSS + Lucide Icons compiled and tested
-  - RBAC: 9 standard restaurant roles (`owner`, `manager`, `cashier`, `kitchen_staff`, `storekeeper`, `purchase_officer`, `accountant`, `hr`, `auditor`)
-  - Double-Entry General Ledger Core: `chart_of_accounts` (34 standard restaurant accounts), `payment_accounts` (6 accounts), `journals`, and `journal_lines`
-  - Universal `AuditLogger` with before/after payloads and user tracking
-- **Menu, Units & Recipe BOM Engine**: **Completed (Phase 1)**
-  - Multi-tier Unit Conversion Matrix (`UnitConversionService`) supporting bi-directional weight, volume, and count conversions (`kg` <-> `g`, `L` <-> `ml`, `ctn` <-> `can`/`pcs`)
-  - Multi-Location Perpetual Stock Ledger (`StockMovementService`) tracking on-hand quantities across Main Store, Kitchen, and Bar with moving weighted-average costs and FEFO batch dispatching
-  - Menu & Product Catalog: Dishes, variants, modifiers, kitchen station routing, and tax modes
-  - Recipe & Bill of Materials (BOM) Engine (`RecipeCostingService`): Nested sub-recipes, trim/waste loss allowances, theoretical food cost calculation, food cost %, and target margin pricing
-  - Frontend Vue Pages: `/menu` (Catalog), `/recipes` (BOM builder & costing), `/inventory` (Stock on-hand & ledger movements)
-- **Restaurant POS, Tables & KDS**: Next (Phase 2)
-- **Procurement & GRN**: Pending (Phase 3)
-- **Consumables & Double-Entry GL**: Pending (Phase 4)
-- **HR, Payroll & Final Hardening**: Pending (Phase 5)
+---
 
+## 3. Core Database Tables & Data Model
+1. **Foundation & RBAC**:
+   - `branches`: Multi-branch ready with branch currency, phone, and timezone.
+   - `roles`, `permissions`, `user_roles`, `users`: Role-based access control (`owner`, `manager`, `cashier`, `staff`).
+   - `audit_logs`: Immutable tracking of user actions, before/after payloads, and IP addresses.
+2. **Products & Unit Conversions**:
+   - `categories`: Classified into `raw_material`, `consumable`, `other_stock`.
+   - `suppliers`: Supplier directory with current payable balances.
+   - `products`: Product master storing `current_stock` and `cost_price` (moving weighted-average) always in `base_unit` (`g`, `kg`, `ml`, `L`, `pcs`).
+   - `product_unit_conversions`: Product-specific conversion matrix (e.g. 1 sack = 25 kg, 1 kg = 1000 g).
+3. **Perpetual Stock Ledger & Movements**:
+   - `purchases` & `purchase_items`: Confirmed stock receipts and direct Purchase & Consume transactions.
+   - `stock_ledger`: Immutable chronological movement log (`opening_stock`, `purchase_receipt`, `consumption`, `wastage`, `adjustment_in`, `adjustment_out`, `purchase_return`). Never overwrites previous rows.
+   - `consumptions` & `consumption_items`: Daily ingredient actual usage records.
+   - `consumable_allocations`: Multi-day consumable amortized allocation schedules.
+   - `wastages`: Spoilage, burnt, or expired item records with reasons.
+   - `stock_counts` & `stock_count_items`: Physical count vs system balance with discrepancy tracking.
+4. **Daily Sales & Financial Accounts**:
+   - `daily_sales`: Total gross sales with breakdown into Cash, bKash, Nagad, Card/Bank, Other, and discrepancy amount.
+   - `operating_expenses`: Daily operating costs (electricity, gas, water, rent, transport, repairs, cleaning, marketing, other).
+   - `financial_accounts`: Accounts tracking Cash Drawer, Bank, bKash, Nagad with opening and current balances.
+   - `account_transactions`: Deposits, withdrawals, and internal transfers (`transfer_in`, `transfer_out`).
+5. **Staff & Payroll**:
+   - `employees`: Staff records with monthly/daily agreed salary.
+   - `employee_attendances`: Daily attendance records (`present`, `absent`, `half_day`, `leave`).
+   - `salary_payments`: Cash disbursals reducing accrued payroll liabilities.
+
+---
+
+## 4. Business Services Layer (`app/Services/`)
+- `StockLedgerService`:
+  - Enforces atomic database locks (`Product::lockForUpdate()`).
+  - Guards against negative stock by default (`ValidationException`).
+  - Recalculates moving weighted-average cost on stock additions:
+    $$\text{New Cost} = \frac{(\text{Current Qty} \times \text{Current Cost}) + (\text{Incoming Qty} \times \text{Incoming Cost})}{\text{Current Qty} + \text{Incoming Qty}}$$
+  - Appends immutable `StockLedger` movements.
+- `PurchaseService`:
+  - Converts purchased units to base units via product-specific multipliers.
+  - Posts stock receipt movement to ledger.
+  - Handles the direct **Purchase & Consume** workflow: immediately executes a linked consumption movement of the same quantity, resulting in 0 remaining stock and 1 single consumption cost in P&L.
+  - Updates supplier payable liability and deducts payments from financial accounts.
+- `ConsumptionService`:
+  - Validates stock availability for every ingredient.
+  - Deducts quantity from on-hand stock and writes consumption records to `stock_ledger` and `consumption_items`.
+- `ConsumableAllocationService`:
+  - Amortizes multi-day items (e.g. ৳120 tissue over 4 days = ৳30/day) and provides daily recognized amortization.
+- `FinancialAccountService`:
+  - Records deposits and withdrawals.
+  - Executes internal account-to-account transfers with the immutable rule: **Internal transfers have 0 effect on Profit & Loss**.
+- `ProfitLossService`:
+  - Computes True Profit & Loss:
+    - $\text{Gross Profit} = \text{Total Sales} - (\text{Ingredient Consumption Cost} + \text{Consumables Allocated Cost})$
+    - $\text{Total Operating Cost} = \text{Operating Expenses} + \text{Staff Salary Accrual} + \text{Wastage Cost}$
+    - $\text{True Net Profit} = \text{Gross Profit} - \text{Total Operating Cost}$
+    - $\text{Net Profit Margin \%} = (\text{Net Profit} / \text{Total Sales}) \times 100$
+
+---
+
+## 5. Web Interface & Route Structure
+All routes render Vue 3 components via Inertia.js with Tailwind CSS v4:
+- `/`: Executive Dashboard (`Dashboard.vue`)
+- `/sales`: Daily Sales Entry & Breakdown (`Sales/Daily.vue`)
+- `/products`: Inventory Products & Conversions (`Products/Index.vue`)
+- `/purchases`: Stock Receiving & Purchase & Consume (`Purchases/Index.vue`)
+- `/consumption`: End-of-Day Usage Entry (`Consumption/Index.vue`)
+- `/consumables`: Amortization Scheduler (`Consumables/Index.vue`)
+- `/ledger`: Perpetual Stock Movement Ledger (`Ledger/Index.vue`)
+- `/expenses`: Operating Expenses Categorization (`Expenses/Index.vue`)
+- `/wastage`: Spoilage & Wastage Entry (`Wastage/Index.vue`)
+- `/stock-counts`: Physical Stock Count Audit (`StockCounts/Index.vue`)
+- `/accounts`: Financial Accounts & Transfers (`Accounts/Index.vue`)
+- `/employees`: Attendance & Payroll (`Employees/Index.vue`)
+- `/reports/profit-loss`: True Profit & Loss Statement (`Reports/ProfitLoss.vue`)
+
+---
+
+## 6. Automated Verification Status
+- **Test Coverage**: 20 automated PHPUnit tests with 85 assertions running against native MySQL 8.4 engine (`royalnest_erp_test`), passing 100% green.
+- **PRD Scenarios Verified**: All 12 mandatory scenarios from PRD v1.1 Section 23 tested and verified in `tests/Feature/PrdMandatoryScenariosTest.php`.
+- **Frontend Compiler**: Vite 8 compiling 26 production bundles with zero errors.

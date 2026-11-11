@@ -2,22 +2,31 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\TestCase;
 
 class WelcomeTest extends TestCase
 {
-    public function test_welcome_page_renders_cleanly_with_inertia(): void
+    use RefreshDatabase;
+
+    public function test_dashboard_renders_cleanly_with_inertia(): void
     {
-        $response = $this->get('/');
+        $user = User::factory()->create([
+            'email' => 'test_' . uniqid() . '@royalnest.com',
+            'primary_role' => 'owner',
+        ]);
+
+        $response = $this->actingAs($user)->get('/');
 
         $response->assertStatus(200);
         $response->assertInertia(fn (Assert $page) => $page
-            ->component('Welcome')
-            ->has('restaurantName')
-            ->has('version')
-            ->where('restaurantName', 'Royal Nest Restaurant ERP')
-            ->where('version', '2.0.0')
+            ->component('Dashboard')
+            ->has('summary')
+            ->has('lowStockProducts')
+            ->has('accounts')
+            ->has('recentMovements')
         );
     }
 }
