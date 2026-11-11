@@ -24,8 +24,13 @@ The platform links Front-of-House (Dine-In, Takeaway, Delivery, Table Management
 - `routes/web.php`: Application route definitions
 
 ## Current Modules Status
-- **Foundation & Scaffold**: Initializing (Phase 0)
-- **Menu, Units & Recipe BOM**: Pending (Phase 1)
+- **Foundation & Scaffold**: **Completed (Phase 0)**
+  - MySQL 8.4 engine active with dedicated databases: `royalnest_erp` and `royalnest_erp_test`
+  - Laravel 12 + Inertia.js + Vue 3 + Tailwind CSS + Lucide Icons compiled and tested
+  - RBAC: 9 standard restaurant roles (`owner`, `manager`, `cashier`, `kitchen_staff`, `storekeeper`, `purchase_officer`, `accountant`, `hr`, `auditor`)
+  - Double-Entry General Ledger Core: `chart_of_accounts` (34 standard restaurant accounts), `payment_accounts` (6 accounts: cash, petty cash, bank, bKash, Nagad, card clearing), `journals`, and `journal_lines`
+  - Universal `AuditLogger` with before/after payloads and user tracking
+- **Menu, Units & Recipe BOM**: Next (Phase 1)
 - **Restaurant POS, Tables & KDS**: Pending (Phase 2)
 - **Procurement & GRN**: Pending (Phase 3)
 - **Consumables & Double-Entry GL**: Pending (Phase 4)
