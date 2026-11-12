@@ -30,6 +30,11 @@ class OperatingExpense extends Model
         return $this->belongsTo(FinancialAccount::class, 'payment_account_id');
     }
 
+    public function financialAccount(): BelongsTo
+    {
+        return $this->paymentAccount();
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
