@@ -35,7 +35,7 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
 - **Localization**: Dedicated bilingual i18n dictionary (`bn.json`, `en.json`) with `useI18n` composable
 - **Database Engine**: MySQL 8.4 (InnoDB transactions with row-level locks, `DECIMAL(12, 4)` inventory precision, `DECIMAL(12, 2)` monetary values)
 - **Timezone & Locale**: BDT (`৳`), `Asia/Dhaka` timezone
-- **Repository Isolation**: `d:\Projects\Saba POS\royal-nest` (completely isolated git repository, ignored by parent `.gitignore`)
+- **Repository & Remote**: `d:\Projects\Saba POS\royal-nest` (standalone git repository, remote: `https://github.com/XhihabX/royalnest.git`, branch `main`)
 - **Packaging**: Self-contained production release script (`package_production.py`)
 
 ---
