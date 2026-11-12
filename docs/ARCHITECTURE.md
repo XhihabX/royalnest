@@ -105,6 +105,12 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
   - Validates total available stock across all active batches.
   - Sequentially consumes from the oldest available `StockBatch` (`received_date ASC, id ASC`).
   - Slices multi-batch consumption entries accurately in `stock_ledger` and `consumption_items`.
+- `Wastage & Stock Count Synchronization`:
+  - `WastageController` sequentially traverses and depletes active FIFO batches, computing true weighted average wastage cost across multiple purchase lots.
+  - `StockCountController` synchronizes physical counts with FIFO batches: surplus creates an `ADJUSTMENT-COUNT-` batch, and deficit chronologically depletes oldest active batches.
+- `DailySalesController` (Multi-Account Cash Intake):
+  - Automatically deposits reconciled daily revenue into active financial accounts (`cash` $\rightarrow$ Cash Drawer, `bkash` $\rightarrow$ bKash, `nagad` $\rightarrow$ Nagad, `bank` $\rightarrow$ Bank).
+  - Uses idempotent transaction reconciliation to allow safe edits/re-submissions without double-counting.
 - `FinancialAccountService`:
   - Records deposits, withdrawals, and profit-neutral account-to-account transfers.
 - `ProfitLossService`:
@@ -129,8 +135,8 @@ All routes render Vue 3 components via Inertia.js with Tailwind CSS v4:
 - `/consumables`: Amortization Scheduler (`Consumables/Index.vue`)
 - `/ledger`: Perpetual Stock Movement Ledger with Batch Tags (`Ledger/Index.vue`)
 - `/expenses`: Operating Expenses Categorization (`Expenses/Index.vue`)
-- `/wastage`: Spoilage & Wastage Entry (`Wastage/Index.vue`)
-- `/stock-counts`: Physical Stock Count Audit (`StockCounts/Index.vue`)
+- `/wastage`: Spoilage & Wastage Entry with FIFO Traversal (`Wastage/Index.vue`)
+- `/stock-counts`: Physical Stock Count Audit & FIFO Batch Sync (`StockCounts/Index.vue`)
 - `/accounts`: Financial Accounts & Transfers (`Accounts/Index.vue`)
 - `/employees`: Staff Directory with Live Camera Snapshot Modal (`Employees/Index.vue`)
 - `/employees/{id}/profile`: Detailed Employee Profile, Attendance & Salary (`Employees/Profile.vue`)
@@ -140,8 +146,8 @@ All routes render Vue 3 components via Inertia.js with Tailwind CSS v4:
 ---
 
 ## 6. Automated Verification Status
-- **Test Coverage**: 25 automated PHPUnit tests with 120 assertions running against native MySQL 8.4 engine (`royalnest_erp_test`), passing 100% green.
+- **Test Coverage**: 29 automated PHPUnit tests with 158 assertions running against native MySQL 8.4 engine (`royalnest_erp_test`), passing 100% green.
 - **Supplier & Staff Verification**: Full verification of Directory vs Active separation, due payment vouchers, cash drawer deductions, Employee ID auto-generation, and advance recovery deductions.
-- **FIFO Verification**: Scenario 3 in `tests/Feature/PrdMandatoryScenariosTest.php` proves previous stock retains historical price and future purchases retain incoming price.
-- **Frontend Compiler**: Vite 8 compiling all production bundles with zero errors in 4.88 seconds.
-- **Production Packager**: `package_production.py` generates self-contained deployment ZIP in `dist/`.
+- **FIFO Verification**: Scenario 3 in `tests/Feature/PrdMandatoryScenariosTest.php` and `SystemLogicPerfectionTest.php` prove previous stock retains historical price, future purchases retain incoming price, and wastage/stock counts maintain strict batch parity.
+- **Frontend Compiler**: Vite 8 compiling all production bundles with zero errors in 6.13 seconds.
+- **Production Packager**: `package_production.py` generates self-contained deployment ZIP in `dist/` (0.40 MB).

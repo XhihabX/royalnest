@@ -345,16 +345,27 @@ const submitUpdateSupplier = () => {
                                 >
                                     <td class="px-4 py-3.5 font-mono text-xs text-slate-400 print:text-gray-700 whitespace-nowrap">{{ row.date }}</td>
                                     <td class="px-4 py-3.5 whitespace-nowrap">
-                                        <span
-                                            :class="[
-                                                'px-2 py-0.5 rounded text-[11px] font-mono font-bold',
-                                                row.type === 'payment_voucher' 
-                                                    ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40' 
-                                                    : (row.type === 'advance_voucher' ? 'bg-blue-950/60 text-blue-400 border border-blue-800/40' : 'bg-amber-950/60 text-amber-400 border border-amber-800/40')
-                                            ]"
-                                        >
-                                            {{ row.reference }}
-                                        </span>
+                                        <div class="flex items-center gap-2">
+                                            <span
+                                                :class="[
+                                                    'px-2 py-0.5 rounded text-[11px] font-mono font-bold',
+                                                    row.type === 'payment_voucher' 
+                                                        ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40' 
+                                                        : (row.type === 'advance_voucher' ? 'bg-blue-950/60 text-blue-400 border border-blue-800/40' : 'bg-amber-950/60 text-amber-400 border border-amber-800/40')
+                                                ]"
+                                            >
+                                                {{ row.reference }}
+                                            </span>
+                                            <span 
+                                                v-if="row.type === 'purchase_bill'" 
+                                                :class="[
+                                                    'px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
+                                                    row.bill_status === 'paid' ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/50' : (row.bill_status === 'partially_paid' ? 'bg-amber-900/40 text-amber-300 border border-amber-700/50' : 'bg-rose-900/40 text-rose-300 border border-rose-700/50')
+                                                ]"
+                                            >
+                                                {{ row.bill_status === 'paid' ? 'Paid' : (row.bill_status === 'partially_paid' ? 'Due: ৳' + Number(row.remaining_bill_due).toLocaleString() : 'Unpaid') }}
+                                            </span>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-3.5">
                                         <div class="text-slate-200 print:text-black">{{ row.description }}</div>
@@ -647,3 +658,4 @@ const submitUpdateSupplier = () => {
         </div>
     </AppLayout>
 </template>
+

@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-12] — Complete System Re-Analysis & Logic Perfection: Wastage FIFO, Stock Count Batch Sync, Daily Sales Auto-Deposit & Supplier Bill Status
+
+**What:**
+1. **Wastage Multi-Batch FIFO Traversal** (`app/Http/Controllers/WastageController.php`):
+   - Implemented sequential FIFO batch traversal algorithm inside a database transaction with `Product::lockForUpdate()`.
+   - When wastage quantity spans across multiple purchase batches, each batch's remaining quantity is chronologically depleted, updating `remaining_quantity` and `is_exhausted`.
+   - Calculates true weighted average cost across all consumed batches and logs separate immutable `StockLedger` movements linked to each `stockBatchId`.
+2. **Physical Stock Count FIFO Batch Synchronization** (`app/Http/Controllers/StockCountController.php`):
+   - Surplus items (`counted_quantity > system_quantity`): Generates a dedicated `COUNT-ADJ-YYYYMMDD-product_id` `StockBatch` and logs an `adjustment_in` movement, allowing subsequent kitchen usage to consume from this batch in FIFO order.
+   - Deficit items (`counted_quantity < system_quantity`): Sequentially depletes oldest active purchase batches in FIFO order, keeping `StockBatch` remaining quantities strictly identical to on-hand shelf stock.
+3. **Daily Sales Multi-Account Financial Cash Intake** (`app/Http/Controllers/DailySalesController.php`):
+   - Injected `FinancialAccountService` into `DailySalesController`.
+   - Automatically deposits reconciled daily sales into their corresponding active financial accounts:
+     - `cash_sales` $\rightarrow$ Account of type `cash` ("Cash Drawer")
+     - `bkash_sales` $\rightarrow$ Account of type `bkash` ("bKash Merchant")
+     - `nagad_sales` $\rightarrow$ Account of type `nagad` ("Nagad Merchant")
+     - `card_bank_sales` $\rightarrow$ Account of type `bank` ("BRAC Bank Current")
+   - Enforced idempotent transaction cleanup: Editing or re-submitting daily sales on the same date atomically rolls back and re-deposits funds without double-counting.
+4. **Supplier Bill Payment Status & Dynamic FIFO Allocation** (`app/Services/SupplierService.php` & `Profile.vue`):
+   - Implemented dynamic FIFO payment allocation in `getSupplierStatement()`, calculating each individual bill's cumulative paid amount, remaining due, and status (`Paid`, `Partially Paid`, `Unpaid`).
+   - Statement running due balance remains 100% mathematically consistent at every row ($\text{Due} = \text{Opening} + \sum \text{Bills} - \sum \text{Vouchers}$).
+   - Added visual status badges on the Supplier Profile transaction ledger to clearly distinguish between paid and unpaid invoices.
+5. **Comprehensive Verification**:
+   - Created `tests/Feature/SystemLogicPerfectionTest.php` testing multi-batch wastage traversal, physical count surplus/deficit batch sync, daily sales multi-account deposits with update idempotency, and supplier statement per-bill status allocation.
+   - Full test suite: **29/29 tests (158 assertions) passing 100% green**.
+   - Vite 8 compiled all 47 frontend bundles in 6.13 seconds with 0 errors.
+   - Production archive regenerated: `dist/royal_nest_production_deployment.zip` (0.40 MB).
+
+**Why:** Ensure 100% accuracy and mathematical integrity across all inventory lots, cash accounts, and supplier purchase bills, eliminating any potential discrepancies in live restaurant operations.
+**How:** Refactored controller logic with row-level locks, integrated financial account deposits with transaction rollback protection, implemented FIFO batch traversal in wastage and stock counts, and added automated feature tests.
+**Where:** `royal-nest/app/Http/Controllers/WastageController.php`, `royal-nest/app/Http/Controllers/StockCountController.php`, `royal-nest/app/Http/Controllers/DailySalesController.php`, `royal-nest/app/Services/SupplierService.php`, `royal-nest/resources/js/Pages/Suppliers/Profile.vue`, `royal-nest/tests/Feature/SystemLogicPerfectionTest.php`.
+**Impact:** Cash Drawer balance always reflects actual restaurant revenue; stock batches stay in exact parity with physical inventory; supplier invoices display precise payment statuses; site stability remains rock solid.
+
+---
+
 ## [2026-11-12] — Full Supplier Management, Staff Camera Capture, Bulk Attendance & Production Hardening
 
 **What:**

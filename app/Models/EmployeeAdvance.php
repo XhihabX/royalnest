@@ -50,3 +50,4 @@ class EmployeeAdvance extends Model
         return $this->hasMany(SalaryDeduction::class);
     }
 }
+

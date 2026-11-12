@@ -360,11 +360,50 @@ class SupplierService
         $payments = $paymentsQuery->get();
         $advances = $advancesQuery->get();
 
+        // 1. Dynamic FIFO Bill Allocation:
+        // Allocate payments and advances against purchases chronologically to determine exact per-bill payment status
+        $allPurchases = Purchase::where('supplier_id', $supplier->id)
+            ->where('status', 'confirmed')
+            ->orderBy('purchase_date', 'asc')
+            ->orderBy('id', 'asc')
+            ->get();
+
+        $allPaymentsTotal = (float)SupplierPayment::where('supplier_id', $supplier->id)->sum('amount')
+            + (float)SupplierAdvance::where('supplier_id', $supplier->id)->sum('amount');
+        
+        $paymentPool = $allPaymentsTotal;
+        $billAllocations = [];
+
+        foreach ($allPurchases as $p) {
+            $unpaidAtDelivery = max(0, (float)$p->total_amount - (float)$p->paid_amount);
+            $allocatedFromPool = min($unpaidAtDelivery, $paymentPool);
+            $paymentPool = max(0, round($paymentPool - $allocatedFromPool, 2));
+
+            $totalBillPaid = round((float)$p->paid_amount + $allocatedFromPool, 2);
+            $remainingBillDue = max(0, round((float)$p->total_amount - $totalBillPaid, 2));
+
+            $status = 'unpaid';
+            if ($remainingBillDue <= 0 && (float)$p->total_amount > 0) {
+                $status = 'paid';
+            } elseif ($totalBillPaid > 0) {
+                $status = 'partially_paid';
+            }
+
+            $billAllocations[$p->id] = [
+                'paid_at_delivery' => (float)$p->paid_amount,
+                'allocated_payments' => $allocatedFromPool,
+                'total_paid' => $totalBillPaid,
+                'remaining_due' => $remainingBillDue,
+                'status' => $status,
+            ];
+        }
+
         $rows = collect();
 
         foreach ($purchases as $p) {
             $itemSummary = $p->items->map(fn ($it) => $it->product->name . ' (' . (float)$it->purchase_quantity . ' ' . $it->purchase_unit . ' @ ৳' . (float)$it->unit_price . ')')->join(', ');
             $unpaid = (float)$p->total_amount - (float)$p->paid_amount;
+            $alloc = $billAllocations[$p->id] ?? null;
 
             $rows->push([
                 'date' => $p->purchase_date->toDateString(),
@@ -373,6 +412,9 @@ class SupplierService
                 'description' => 'Goods Received: ' . ($itemSummary ?: 'Kitchen Raw Materials'),
                 'bill_amount' => (float)$p->total_amount,
                 'paid_amount' => (float)$p->paid_amount,
+                'total_bill_paid' => $alloc ? $alloc['total_paid'] : (float)$p->paid_amount,
+                'remaining_bill_due' => $alloc ? $alloc['remaining_due'] : $unpaid,
+                'bill_status' => $alloc ? $alloc['status'] : ($unpaid <= 0 ? 'paid' : 'unpaid'),
                 'net_effect' => $unpaid,
                 'items' => $p->items,
                 'created_at' => $p->created_at,
