@@ -50,3 +50,4 @@ class StockBatch extends Model
         return $this->hasMany(ConsumptionItem::class);
     }
 }
+

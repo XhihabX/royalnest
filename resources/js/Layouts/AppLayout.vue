@@ -1,5 +1,5 @@
 <script setup>
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, usePage, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { 
     UtensilsCrossed, 
@@ -17,8 +17,13 @@ import {
     Users, 
     TrendingUp, 
     AlertCircle,
-    CheckCircle2
+    CheckCircle2,
+    Store,
+    Globe,
+    LogOut,
+    UserCircle
 } from 'lucide-vue-next';
+import { useI18n } from '../Composables/useI18n';
 
 defineProps({
     title: String,
@@ -26,26 +31,34 @@ defineProps({
 
 const page = usePage();
 const flash = computed(() => page.props.flash || {});
+const authUser = computed(() => page.props.auth?.user || null);
+const { t, currentLocale, toggleLocale } = useI18n();
 
-const navItems = [
-    { label: 'Overview', href: '/', icon: LayoutDashboard },
-    { label: 'Daily Sales', href: '/sales', icon: ShoppingBag },
-    { label: 'Stock Receiving', href: '/purchases', icon: Truck },
-    { label: 'Daily Usage', href: '/consumption', icon: Flame },
-    { label: 'Consumables', href: '/consumables', icon: PackageCheck },
-    { label: 'Stock Ledger', href: '/ledger', icon: Layers },
-    { label: 'Wastage', href: '/wastage', icon: Trash2 },
-    { label: 'Stock Count', href: '/stock-counts', icon: ClipboardCheck },
-    { label: 'Products', href: '/products', icon: Boxes },
-    { label: 'Operating Costs', href: '/expenses', icon: Receipt },
-    { label: 'Cash & Accounts', href: '/accounts', icon: Landmark },
-    { label: 'Staff & Payroll', href: '/employees', icon: Users },
-    { label: 'Profit & Loss', href: '/reports/profit-loss', icon: TrendingUp },
-];
+const navItems = computed(() => [
+    { label: t('dashboard', 'Overview'), href: '/', icon: LayoutDashboard },
+    { label: t('daily_sales', 'Daily Sales'), href: '/sales', icon: ShoppingBag },
+    { label: t('suppliers', 'Suppliers / Dealers'), href: '/suppliers/active', icon: Store },
+    { label: t('purchases', 'Stock Receiving'), href: '/purchases', icon: Truck },
+    { label: t('consumption', 'Kitchen Usage'), href: '/consumption', icon: Flame },
+    { label: t('consumables', 'Consumables'), href: '/consumables', icon: PackageCheck },
+    { label: t('ledger', 'Stock Ledger'), href: '/ledger', icon: Layers },
+    { label: t('wastage', 'Wastage'), href: '/wastage', icon: Trash2 },
+    { label: t('stock_counts', 'Stock Count'), href: '/stock-counts', icon: ClipboardCheck },
+    { label: t('products', 'Products'), href: '/products', icon: Boxes },
+    { label: t('expenses', 'Operating Costs'), href: '/expenses', icon: Receipt },
+    { label: t('accounts', 'Cash & Accounts'), href: '/accounts', icon: Landmark },
+    { label: t('employees', 'Staff & Payroll'), href: '/employees', icon: Users },
+    { label: t('reports', 'Profit & Loss'), href: '/reports/profit-loss', icon: TrendingUp },
+]);
 
 const isActive = (href) => {
     if (href === '/') return page.url === '/';
+    if (href.startsWith('/suppliers')) return page.url.startsWith('/suppliers');
     return page.url.startsWith(href);
+};
+
+const handleLogout = () => {
+    router.post('/logout');
 };
 </script>
 
@@ -61,15 +74,42 @@ const isActive = (href) => {
                         </div>
                         <div>
                             <span class="text-base font-bold text-white tracking-tight">Royal Nest</span>
-                            <span class="block text-xs text-amber-400 -mt-0.5 font-medium">Cost & Profit Engine</span>
+                            <span class="block text-xs text-amber-400 -mt-0.5 font-medium">Café & Restaurant ERP</span>
                         </div>
                     </Link>
                 </div>
 
-                <div class="flex items-center space-x-4">
-                    <div class="text-right hidden sm:block">
+                <div class="flex items-center space-x-3">
+                    <!-- Language Switcher Toggle -->
+                    <button
+                        type="button"
+                        @click="toggleLocale"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition shadow-sm active:scale-95"
+                        :title="currentLocale === 'bn' ? 'Switch to English' : 'বাংলা ভাষায় পরিবর্তন করুন'"
+                    >
+                        <Globe class="w-3.5 h-3.5 text-amber-400" />
+                        <span>{{ currentLocale === 'bn' ? 'বাংলা (BN)' : 'English (EN)' }}</span>
+                    </button>
+
+                    <!-- User Profile & Logout -->
+                    <div v-if="authUser" class="flex items-center gap-2 pl-2 border-l border-slate-800">
+                        <div class="hidden sm:block text-right">
+                            <span class="text-xs font-semibold text-slate-200 block leading-tight">{{ authUser.name }}</span>
+                            <span class="text-[10px] text-amber-400 font-mono uppercase tracking-wider">{{ authUser.role }}</span>
+                        </div>
+                        <button
+                            type="button"
+                            @click="handleLogout"
+                            class="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 border border-transparent hover:border-rose-900/40 transition"
+                            :title="t('logout', 'Logout')"
+                        >
+                            <LogOut class="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    <div v-else class="text-right hidden sm:block">
                         <span class="text-xs font-semibold text-slate-200">Main Restaurant</span>
-                        <span class="block text-[11px] text-emerald-400 font-mono">Perpetual Stock Active • ৳ BDT</span>
+                        <span class="block text-[11px] text-emerald-400 font-mono">Perpetual Stock • ৳ BDT</span>
                     </div>
                 </div>
             </div>

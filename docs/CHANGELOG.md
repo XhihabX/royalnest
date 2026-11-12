@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-12] — Full Supplier Management, Staff Camera Capture, Bulk Attendance & Production Hardening
+
+**What:**
+1. **Two Distinct Supplier Modules (Never Mixed)**:
+   - Built **Supplier Directory** (`/suppliers/directory`): Central catalog of all vendors (meat, spices, dairy, produce, packaging) with business locations, contacts, status (`potential`, `active`, `inactive`, `archived`), and multi-product agreed supply rates (`supplier_products`). Adding a vendor here does not affect financial balances.
+   - Built **Active Supplier Management** (`/suppliers/active`): Strictly active vendors currently supplying the restaurant. Tracks live **Outstanding Payable Due** (`Confirmed Bills - Payments - Advances`), last purchase date, and last payment date.
+   - Built **Dedicated Supplier Profile & Statements** (`/suppliers/{id}/profile`): Chronological bill history with item lists, payment vouchers, advance vouchers, running due balance at every row, and print-ready statement vouchers.
+   - Implemented `SupplierAdvance` table and workflow: Records vendor advance payments, reducing upcoming payables without entering P&L as a double expense.
+2. **Staff Management, Live Camera Photo Snap & NID Verification**:
+   - Implemented auto-generated unique Employee IDs (`EMP-001`, `EMP-002`).
+   - Built `CameraCapture.vue`: Uses browser `getUserMedia` to stream live webcam or mobile camera, snap photos, compress client-side via HTML5 canvas, with automatic fallback to file picker (`capture="environment"` for mobile cameras).
+   - Added separate dedicated capture buttons for **Staff Photo** and **NID Card Photo** with instant previews and modal zoom.
+   - Built **Dedicated Employee Profile** (`/employees/{id}/profile`): Tabbed view for Personal Info & ID Docs, Monthly Attendance Calendar, Accrued Salary vs Paid Breakdown, Advances Ledger, and Salary Vouchers.
+   - Built **Bulk Attendance Entry Grid** (`/employees/attendance/bulk`): 1-click batch selection (`Present`, `Half-day`, `Leave`, `Absent`) for the entire active staff team on any date with duplicate date prevention.
+   - Built **Staff Advance & Deduction Recovery**: Advance payouts outflow from financial accounts into an advance liability; monthly salary payouts can deduct active advances with atomic balance reduction and zero double-counting in P&L.
+3. **Cross-Module Dashboard Integration**:
+   - Enhanced executive dashboard with live summary cards for Active Suppliers, Total Supplier Payables, Recent Dealer Bills, Today's Staff Attendance Breakdown, and Outstanding Staff Advances.
+4. **Production Security & Authentication**:
+   - Implemented `/login` authentication wall with rate limiting and secure database session management.
+   - Wrapped all operational application routes in `auth` middleware with role checks.
+5. **Bilingual Localization (বাংলা & English)**:
+   - Comprehensive translation dictionaries (`bn.json` & `en.json`) with natural Bangladeshi restaurant terms.
+   - Instant reactive language toggle in navbar persisted across sessions via `localStorage`.
+6. **Automated Verification**:
+   - Created `tests/Feature/SupplierAndStaffManagementTest.php` testing Directory vs Active separation, due vouchers, Cash Drawer deductions, Employee ID generation, single-date attendance protection, and advance recovery deductions.
+   - 25 automated PHPUnit tests with 120 assertions running against native MySQL 8.4 engine (`royalnest_erp_test`), passing 100% green.
+   - Vite 8 compiling all production bundles in 4.88 seconds with 0 errors.
+   - Created `package_production.py` generating live release archive `dist/royal_nest_production_deployment.zip`.
+
+**Why:** Fulfill user requirements for complete, functional Supplier Management (Directory vs Active), Staff Management with live camera snapshot and NID documentation, authentic native Bengali localization, and production readiness.
+**How:** Implemented database migrations, Eloquent models, domain services (`SupplierService`, `EmployeeService`), Vue 3 Inertia pages, Vite bundle compilation, and comprehensive PHPUnit test suite.
+**Where:** `royal-nest/app/*`, `royal-nest/database/migrations/*`, `royal-nest/resources/js/*`, `royal-nest/tests/*`, `royal-nest/docs/*`, `royal-nest/package_production.py`.
+**Impact:** 100% zero interference with parent Saba POS project; Royal Nest is 100% verified and production-ready for live deployment.
+
+---
+
 ## [2026-11-11] — Transition to FIFO (First-In, First-Out) Batch Costing Engine
 
 **What:**

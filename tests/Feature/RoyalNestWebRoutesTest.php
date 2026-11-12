@@ -22,7 +22,19 @@ class RoyalNestWebRoutesTest extends TestCase
         ]);
     }
 
-    public function test_all_primary_routes_render_successfully(): void
+    public function test_unauthenticated_users_are_redirected_to_login(): void
+    {
+        $response = $this->get('/');
+        $response->assertRedirect('/login');
+    }
+
+    public function test_login_page_renders_successfully(): void
+    {
+        $response = $this->get('/login');
+        $response->assertStatus(200);
+    }
+
+    public function test_all_primary_authenticated_routes_render_successfully(): void
     {
         $this->actingAs($this->user);
 
@@ -30,6 +42,8 @@ class RoyalNestWebRoutesTest extends TestCase
             '/',
             '/sales',
             '/products',
+            '/suppliers/directory',
+            '/suppliers/active',
             '/purchases',
             '/consumption',
             '/consumables',
@@ -39,6 +53,7 @@ class RoyalNestWebRoutesTest extends TestCase
             '/stock-counts',
             '/accounts',
             '/employees',
+            '/employees/attendance/bulk',
             '/reports/profit-loss',
         ];
 
@@ -48,4 +63,3 @@ class RoyalNestWebRoutesTest extends TestCase
         }
     }
 }
-
