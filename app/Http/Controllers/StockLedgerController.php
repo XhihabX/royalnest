@@ -44,4 +44,3 @@ class StockLedgerController extends Controller
         ]);
     }
 }
-

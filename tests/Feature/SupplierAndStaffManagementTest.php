@@ -3,12 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\Category;
 use App\Models\Employee;
-use App\Models\EmployeeAdvance;
+use App\Models\EmployeeAttendance;
 use App\Models\FinancialAccount;
 use App\Models\Product;
+use App\Models\SalaryDeduction;
 use App\Models\Supplier;
-use App\Models\SupplierPayment;
 use App\Models\User;
 use App\Services\EmployeeService;
 use App\Services\PurchaseService;
@@ -21,10 +22,15 @@ class SupplierAndStaffManagementTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected Branch $branch;
+
     protected FinancialAccount $cashDrawer;
+
     protected SupplierService $supplierService;
+
     protected EmployeeService $employeeService;
+
     protected PurchaseService $purchaseService;
 
     protected function setUp(): void
@@ -39,7 +45,7 @@ class SupplierAndStaffManagementTest extends TestCase
 
         $this->user = User::factory()->create([
             'branch_id' => $this->branch->id,
-            'email' => 'manager_' . uniqid() . '@royalnest.com',
+            'email' => 'manager_'.uniqid().'@royalnest.com',
             'primary_role' => 'manager',
         ]);
 
@@ -90,7 +96,7 @@ class SupplierAndStaffManagementTest extends TestCase
             'unit_price' => 750.00,
             'min_order_quantity' => 10,
         ]);
-        $this->assertEquals(750.00, (float)$prod->unit_price);
+        $this->assertEquals(750.00, (float) $prod->unit_price);
     }
 
     public function test_supplier_purchases_and_due_payments_flow(): void
@@ -102,11 +108,11 @@ class SupplierAndStaffManagementTest extends TestCase
             'opening_balance' => 1000.00,
         ]);
 
-        $this->assertEquals(1000.00, (float)$supplier->current_balance);
+        $this->assertEquals(1000.00, (float) $supplier->current_balance);
 
-        $category = \App\Models\Category::create([
+        $category = Category::create([
             'name' => 'Spices',
-            'slug' => 'spices-' . uniqid(),
+            'slug' => 'spices-'.uniqid(),
             'type' => 'raw_material',
         ]);
 
@@ -124,7 +130,7 @@ class SupplierAndStaffManagementTest extends TestCase
         $purchase = $this->purchaseService->confirmPurchase(
             [
                 'supplier_id' => $supplier->id,
-                'invoice_no' => 'BILL-' . uniqid(),
+                'invoice_no' => 'BILL-'.uniqid(),
                 'purchase_date' => now()->toDateString(),
                 'paid_amount' => 1500.00,
                 'payment_account_id' => $this->cashDrawer->id,
@@ -135,7 +141,7 @@ class SupplierAndStaffManagementTest extends TestCase
                     'purchase_quantity' => 10,
                     'purchase_unit' => 'kg',
                     'unit_price' => 400.00,
-                ]
+                ],
             ],
             $this->user->id
         );
@@ -144,9 +150,9 @@ class SupplierAndStaffManagementTest extends TestCase
         $supplier->refresh();
 
         // Cash drawer deducted ৳1500
-        $this->assertEquals(98500.00, (float)$this->cashDrawer->current_balance);
+        $this->assertEquals(98500.00, (float) $this->cashDrawer->current_balance);
         // Unpaid bill amount is ৳4000 - ৳1500 = ৳2500. Opening was ৳1000. Total due = ৳3500.
-        $this->assertEquals(3500.00, (float)$supplier->current_balance);
+        $this->assertEquals(3500.00, (float) $supplier->current_balance);
 
         // Record a due payment voucher of ৳2000 from Cash Drawer
         $payment = $this->supplierService->paySupplierDue(
@@ -162,12 +168,12 @@ class SupplierAndStaffManagementTest extends TestCase
         $this->cashDrawer->refresh();
         $supplier->refresh();
 
-        $this->assertEquals(96500.00, (float)$this->cashDrawer->current_balance);
-        $this->assertEquals(1500.00, (float)$supplier->current_balance);
+        $this->assertEquals(96500.00, (float) $this->cashDrawer->current_balance);
+        $this->assertEquals(1500.00, (float) $supplier->current_balance);
 
         // Check statement ledger running balances
         $statement = $this->supplierService->getSupplierStatement($supplier->id);
-        $this->assertEquals(1500.00, (float)$statement['current_balance']);
+        $this->assertEquals(1500.00, (float) $statement['current_balance']);
         $this->assertCount(2, $statement['statement_rows']); // 1 purchase bill + 1 payment voucher
     }
 
@@ -193,7 +199,7 @@ class SupplierAndStaffManagementTest extends TestCase
         $this->employeeService->markAttendance($emp->id, $today, 'present', 'Updated note');
 
         // Check single record per date
-        $attendanceCount = \App\Models\EmployeeAttendance::where('employee_id', $emp->id)
+        $attendanceCount = EmployeeAttendance::where('employee_id', $emp->id)
             ->where('attendance_date', $today)
             ->count();
         $this->assertEquals(1, $attendanceCount);
@@ -210,8 +216,8 @@ class SupplierAndStaffManagementTest extends TestCase
         );
 
         $this->cashDrawer->refresh();
-        $this->assertEquals(97000.00, (float)$this->cashDrawer->current_balance);
-        $this->assertEquals(3000.00, (float)$advance->remaining_balance);
+        $this->assertEquals(97000.00, (float) $this->cashDrawer->current_balance);
+        $this->assertEquals(3000.00, (float) $advance->remaining_balance);
 
         // 4. Disburse salary with ৳3000 advance recovery deduction
         // Gross salary ৳25,000 - ৳3,000 deduction = ৳22,000 net cash outflow
@@ -231,14 +237,14 @@ class SupplierAndStaffManagementTest extends TestCase
         $advance->refresh();
 
         // Cash drawer should be 97000 - 22000 = 75000
-        $this->assertEquals(75000.00, (float)$this->cashDrawer->current_balance);
+        $this->assertEquals(75000.00, (float) $this->cashDrawer->current_balance);
         // Advance should be settled (remaining 0)
-        $this->assertEquals(0.00, (float)$advance->remaining_balance);
+        $this->assertEquals(0.00, (float) $advance->remaining_balance);
         $this->assertEquals('settled', $advance->status);
 
         // Verify salary deduction record created
-        $deduction = \App\Models\SalaryDeduction::where('employee_id', $emp->id)->first();
+        $deduction = SalaryDeduction::where('employee_id', $emp->id)->first();
         $this->assertNotNull($deduction);
-        $this->assertEquals(3000.00, (float)$deduction->amount);
+        $this->assertEquals(3000.00, (float) $deduction->amount);
     }
 }

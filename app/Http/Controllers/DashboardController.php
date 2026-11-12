@@ -45,7 +45,7 @@ class DashboardController extends Controller
 
         // Supplier Cross-Module Stats
         $activeSuppliersCount = Supplier::where('status', 'active')->count();
-        $totalSupplierPayable = (float)Supplier::sum('current_balance');
+        $totalSupplierPayable = (float) Supplier::sum('current_balance');
         $recentPurchases = Purchase::with(['supplier', 'creator'])->latest('purchase_date')->limit(5)->get();
         $recentSupplierPayments = SupplierPayment::with(['supplier', 'account'])->latest('payment_date')->limit(5)->get();
 
@@ -60,7 +60,7 @@ class DashboardController extends Controller
             'total_active' => $activeStaffCount,
         ];
 
-        $totalStaffAdvances = (float)EmployeeAdvance::sum('remaining_balance');
+        $totalStaffAdvances = (float) EmployeeAdvance::sum('remaining_balance');
         $recentSalaryPayments = SalaryPayment::with(['employee', 'account'])->latest('payment_date')->limit(5)->get();
 
         return Inertia::render('Dashboard', [

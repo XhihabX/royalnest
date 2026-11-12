@@ -20,7 +20,7 @@ class StockCount extends Model
     ];
 
     protected $casts = [
-        'count_date' => 'date',
+        'count_date' => 'date:Y-m-d',
     ];
 
     public function creator(): BelongsTo
@@ -38,4 +38,3 @@ class StockCount extends Model
         return $this->hasMany(StockCountItem::class);
     }
 }
-

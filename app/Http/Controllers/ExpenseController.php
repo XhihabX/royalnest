@@ -52,10 +52,10 @@ class ExpenseController extends Controller
             'created_by' => auth()->id() ?: 1,
         ]);
 
-        if (!empty($validated['payment_account_id'])) {
+        if (! empty($validated['payment_account_id'])) {
             $this->accountService->withdraw(
-                accountId: (int)$validated['payment_account_id'],
-                amount: (float)$validated['amount'],
+                accountId: (int) $validated['payment_account_id'],
+                amount: (float) $validated['amount'],
                 date: $validated['expense_date'],
                 referenceType: OperatingExpense::class,
                 referenceId: $expense->id,
@@ -66,4 +66,3 @@ class ExpenseController extends Controller
         return redirect()->back()->with('success', 'Operating expense recorded.');
     }
 }
-

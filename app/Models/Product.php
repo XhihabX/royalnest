@@ -90,4 +90,3 @@ class Product extends Model
             ->orderBy('id', 'asc');
     }
 }
-

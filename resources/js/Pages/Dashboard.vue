@@ -117,7 +117,7 @@ const onDateChange = () => {
             <!-- Total Operating Costs Card -->
             <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 relative overflow-hidden">
                 <div class="flex items-center justify-between mb-3">
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Operating & Labour</span>
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">{{ t('operating_costs', 'Operating & Labour') }}</span>
                     <div class="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                         <Receipt class="w-4 h-4" />
                     </div>
@@ -411,7 +411,7 @@ const onDateChange = () => {
                                 {{ mv.quantity_out > 0 ? '-' + Number(mv.quantity_out).toFixed(2) : '—' }}
                             </td>
                             <td class="py-2.5 text-right font-mono font-bold text-slate-200">
-                                {{ Number(mv.ending_stock).toFixed(2) }}
+                                {{ Number(mv.balance_after ?? mv.ending_stock ?? 0).toFixed(2) }}
                             </td>
                             <td class="py-2.5 text-right font-mono text-slate-300">
                                 ৳{{ Number(mv.unit_cost).toFixed(2) }}

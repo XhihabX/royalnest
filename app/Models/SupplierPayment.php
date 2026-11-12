@@ -22,7 +22,7 @@ class SupplierPayment extends Model
     ];
 
     protected $casts = [
-        'payment_date' => 'date',
+        'payment_date' => 'date:Y-m-d',
         'amount' => 'decimal:2',
     ];
 
@@ -41,4 +41,3 @@ class SupplierPayment extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 }
-

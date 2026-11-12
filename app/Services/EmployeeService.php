@@ -28,13 +28,15 @@ class EmployeeService
             ->orderBy('id', 'desc')
             ->first();
 
-        if (!$lastEmp || !preg_match('/EMP-(\d+)/', $lastEmp->employee_id, $matches)) {
+        if (! $lastEmp || ! preg_match('/EMP-(\d+)/', $lastEmp->employee_id, $matches)) {
             $count = Employee::count();
-            return 'EMP-' . str_pad((string)($count + 1), 3, '0', STR_PAD_LEFT);
+
+            return 'EMP-'.str_pad((string) ($count + 1), 3, '0', STR_PAD_LEFT);
         }
 
-        $nextNum = ((int)$matches[1]) + 1;
-        return 'EMP-' . str_pad((string)$nextNum, 3, '0', STR_PAD_LEFT);
+        $nextNum = ((int) $matches[1]) + 1;
+
+        return 'EMP-'.str_pad((string) $nextNum, 3, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -42,7 +44,7 @@ class EmployeeService
      */
     public function createEmployee(array $data): Employee
     {
-        $employeeId = !empty($data['employee_id']) ? trim($data['employee_id']) : $this->generateNextEmployeeId();
+        $employeeId = ! empty($data['employee_id']) ? trim($data['employee_id']) : $this->generateNextEmployeeId();
 
         $photoPath = $this->saveImageFileOrBase64($data['photo'] ?? null, 'staff');
         $nidPhotoPath = $this->saveImageFileOrBase64($data['nid_photo'] ?? null, 'staff/nid');
@@ -60,8 +62,8 @@ class EmployeeService
             'role' => trim($data['role']),
             'joining_date' => $data['joining_date'] ?? now()->toDateString(),
             'salary_type' => $data['salary_type'] ?? 'monthly',
-            'agreed_salary' => (float)$data['agreed_salary'],
-            'hourly_rate' => isset($data['hourly_rate']) ? (float)$data['hourly_rate'] : null,
+            'agreed_salary' => (float) $data['agreed_salary'],
+            'hourly_rate' => isset($data['hourly_rate']) ? (float) $data['hourly_rate'] : null,
             'status' => $data['status'] ?? 'active',
             'notes' => $data['notes'] ?? null,
             'is_active' => ($data['status'] ?? 'active') === 'active',
@@ -83,18 +85,18 @@ class EmployeeService
             'role' => trim($data['role']),
             'joining_date' => $data['joining_date'] ?? $employee->joining_date,
             'salary_type' => $data['salary_type'] ?? $employee->salary_type,
-            'agreed_salary' => (float)$data['agreed_salary'],
-            'hourly_rate' => isset($data['hourly_rate']) ? (float)$data['hourly_rate'] : $employee->hourly_rate,
+            'agreed_salary' => (float) $data['agreed_salary'],
+            'hourly_rate' => isset($data['hourly_rate']) ? (float) $data['hourly_rate'] : $employee->hourly_rate,
             'status' => $data['status'] ?? $employee->status,
             'notes' => $data['notes'] ?? null,
             'is_active' => ($data['status'] ?? $employee->status) === 'active',
         ];
 
-        if (!empty($data['photo'])) {
+        if (! empty($data['photo'])) {
             $updateData['photo_path'] = $this->saveImageFileOrBase64($data['photo'], 'staff');
         }
 
-        if (!empty($data['nid_photo'])) {
+        if (! empty($data['nid_photo'])) {
             $updateData['nid_photo_path'] = $this->saveImageFileOrBase64($data['nid_photo'], 'staff/nid');
         }
 
@@ -129,7 +131,7 @@ class EmployeeService
             foreach ($records as $rec) {
                 EmployeeAttendance::updateOrCreate(
                     [
-                        'employee_id' => (int)$rec['employee_id'],
+                        'employee_id' => (int) $rec['employee_id'],
                         'attendance_date' => $date,
                     ],
                     [
@@ -169,7 +171,7 @@ class EmployeeService
             $userId
         ) {
             $employee = Employee::findOrFail($employeeId);
-            $voucherNo = 'EADV-' . date('Ymd', strtotime($advanceDate)) . '-' . strtoupper(substr(uniqid(), -5));
+            $voucherNo = 'EADV-'.date('Ymd', strtotime($advanceDate)).'-'.strtoupper(substr(uniqid(), -5));
 
             $advance = EmployeeAdvance::create([
                 'employee_id' => $employee->id,
@@ -262,10 +264,12 @@ class EmployeeService
                     ->get();
 
                 foreach ($activeAdvances as $adv) {
-                    if ($remainingToDeduct <= 0) break;
+                    if ($remainingToDeduct <= 0) {
+                        break;
+                    }
 
-                    $deductFromThis = min((float)$adv->remaining_balance, $remainingToDeduct);
-                    $adv->remaining_balance = round((float)$adv->remaining_balance - $deductFromThis, 2);
+                    $deductFromThis = min((float) $adv->remaining_balance, $remainingToDeduct);
+                    $adv->remaining_balance = round((float) $adv->remaining_balance - $deductFromThis, 2);
                     $adv->status = $adv->remaining_balance == 0 ? 'settled' : 'partially_deducted';
                     $adv->save();
 
@@ -323,7 +327,7 @@ class EmployeeService
         $leaveDays = $monthAttendances->where('status', 'leave')->count();
 
         // Salary calculations
-        $agreedSalary = (float)$employee->agreed_salary;
+        $agreedSalary = (float) $employee->agreed_salary;
         $accruedSalary = $agreedSalary;
 
         // If daily wage, multiply present + 0.5 * half_day
@@ -365,7 +369,7 @@ class EmployeeService
 
     protected function saveImageFileOrBase64(mixed $fileOrData, string $folder): ?string
     {
-        if (!$fileOrData) {
+        if (! $fileOrData) {
             return null;
         }
 
@@ -377,8 +381,9 @@ class EmployeeService
             $parts = explode(',', $fileOrData);
             if (count($parts) === 2) {
                 $decoded = base64_decode($parts[1]);
-                $filename = $folder . '/' . Str::random(32) . '.jpg';
+                $filename = $folder.'/'.Str::random(32).'.jpg';
                 Storage::disk('public')->put($filename, $decoded);
+
                 return $filename;
             }
         }
@@ -386,4 +391,3 @@ class EmployeeService
         return null;
     }
 }
-

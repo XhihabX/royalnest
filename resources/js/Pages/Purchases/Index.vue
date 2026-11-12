@@ -3,6 +3,9 @@ import { ref, computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Truck, Plus, CheckCircle, Trash2, Zap, AlertCircle } from 'lucide-vue-next';
+import { useI18n } from '@/Composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
     purchases: Array,
@@ -31,7 +34,11 @@ const onProductSelect = (index) => {
     const prod = props.products.find(p => p.id === pId);
     if (prod) {
         form.items[index].purchase_unit = prod.purchase_unit;
-        form.items[index].unit_price = Number(prod.cost_price) || 0;
+        const conv = prod.unit_conversions?.find(c => c.purchase_unit === prod.purchase_unit) 
+            || prod.unitConversions?.find(c => c.purchase_unit === prod.purchase_unit);
+        const multiplier = conv ? Number(conv.multiplier_to_base) : 1;
+        const baseCost = Number(prod.cost_price) || 0;
+        form.items[index].unit_price = Number((baseCost * multiplier).toFixed(2)) || 0;
     }
 };
 
@@ -70,9 +77,9 @@ const submit = () => {
     <AppLayout title="Stock Receiving & Purchasing">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-white tracking-tight">Stock Receiving & Purchases</h1>
+                <h1 class="text-2xl font-bold text-white tracking-tight">{{ t('purchases', 'Stock Receiving & Purchases') }}</h1>
                 <p class="text-xs text-slate-400 mt-1">
-                    Confirmed receipts increase perpetual stock and update moving weighted-average costs.
+                    {{ t('purchases_desc', 'Confirmed receipts create FIFO lots and increase perpetual inventory stock.') }}
                 </p>
             </div>
 
@@ -81,7 +88,7 @@ const submit = () => {
                 class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer"
             >
                 <Plus class="w-4 h-4" />
-                <span>Record Stock Receipt</span>
+                <span>{{ t('record_purchase', 'Record Stock Receipt') }}</span>
             </button>
         </div>
 

@@ -2,13 +2,11 @@
 
 namespace App\Services;
 
-use App\Models\FinancialAccount;
 use App\Models\Purchase;
 use App\Models\Supplier;
 use App\Models\SupplierAdvance;
 use App\Models\SupplierPayment;
 use App\Models\SupplierProduct;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -24,11 +22,11 @@ class SupplierService
      */
     public function createDirectorySupplier(array $data): Supplier
     {
-        $openingBalance = isset($data['opening_balance']) ? (float)$data['opening_balance'] : 0.00;
+        $openingBalance = isset($data['opening_balance']) ? (float) $data['opening_balance'] : 0.00;
 
         $supplier = Supplier::create([
             'name' => trim($data['name']),
-            'company_name' => !empty($data['company_name']) ? trim($data['company_name']) : null,
+            'company_name' => ! empty($data['company_name']) ? trim($data['company_name']) : null,
             'contact_person' => $data['contact_person'] ?? null,
             'phone' => $data['phone'] ?? null,
             'alternative_phone' => $data['alternative_phone'] ?? null,
@@ -45,9 +43,9 @@ class SupplierService
         ]);
 
         // Add initial products if supplied
-        if (!empty($data['products']) && is_array($data['products'])) {
+        if (! empty($data['products']) && is_array($data['products'])) {
             foreach ($data['products'] as $prod) {
-                if (!empty($prod['product_name'])) {
+                if (! empty($prod['product_name'])) {
                     $this->addSupplierProduct($supplier, $prod);
                 }
             }
@@ -63,7 +61,7 @@ class SupplierService
     {
         $supplier->update([
             'name' => trim($data['name']),
-            'company_name' => !empty($data['company_name']) ? trim($data['company_name']) : null,
+            'company_name' => ! empty($data['company_name']) ? trim($data['company_name']) : null,
             'contact_person' => $data['contact_person'] ?? null,
             'phone' => $data['phone'] ?? null,
             'alternative_phone' => $data['alternative_phone'] ?? null,
@@ -86,7 +84,7 @@ class SupplierService
      */
     public function setStatus(Supplier $supplier, string $status): Supplier
     {
-        if (!in_array($status, ['potential', 'active', 'inactive', 'archived'])) {
+        if (! in_array($status, ['potential', 'active', 'inactive', 'archived'])) {
             throw ValidationException::withMessages(['status' => 'Invalid supplier status.']);
         }
 
@@ -108,8 +106,8 @@ class SupplierService
             'product_name' => trim($productData['product_name']),
             'product_category' => $productData['product_category'] ?? null,
             'purchase_unit' => trim($productData['purchase_unit']),
-            'unit_price' => (float)$productData['unit_price'],
-            'min_order_quantity' => isset($productData['min_order_quantity']) ? (float)$productData['min_order_quantity'] : null,
+            'unit_price' => (float) $productData['unit_price'],
+            'min_order_quantity' => isset($productData['min_order_quantity']) ? (float) $productData['min_order_quantity'] : null,
             'notes' => $productData['notes'] ?? null,
         ]);
     }
@@ -151,7 +149,7 @@ class SupplierService
         ) {
             $supplier = Supplier::lockForUpdate()->findOrFail($supplierId);
 
-            $voucherNo = 'VCH-' . date('Ymd', strtotime($paymentDate)) . '-' . strtoupper(substr(uniqid(), -5));
+            $voucherNo = 'VCH-'.date('Ymd', strtotime($paymentDate)).'-'.strtoupper(substr(uniqid(), -5));
 
             $payment = SupplierPayment::create([
                 'supplier_id' => $supplier->id,
@@ -213,7 +211,7 @@ class SupplierService
         ) {
             $supplier = Supplier::lockForUpdate()->findOrFail($supplierId);
 
-            $voucherNo = 'ADV-' . date('Ymd', strtotime($advanceDate)) . '-' . strtoupper(substr(uniqid(), -5));
+            $voucherNo = 'ADV-'.date('Ymd', strtotime($advanceDate)).'-'.strtoupper(substr(uniqid(), -5));
 
             $advance = SupplierAdvance::create([
                 'supplier_id' => $supplier->id,
@@ -256,9 +254,9 @@ class SupplierService
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('company_name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('contact_person', 'like', "%{$search}%");
+                    ->orWhere('company_name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('contact_person', 'like', "%{$search}%");
             });
         }
 
@@ -300,16 +298,18 @@ class SupplierService
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('company_name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
+                    ->orWhere('company_name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
         $suppliers = $query->orderBy('name')->get()->map(function ($s) {
-            $s->total_purchased = (float)($s->total_purchased ?? 0);
-            $s->total_paid = (float)($s->total_paid ?? 0) + (float)($s->total_advances ?? 0);
+            $s->total_purchased = (float) ($s->total_purchased ?? 0);
+            $paidAtDelivery = (float) Purchase::where('supplier_id', $s->id)->where('status', 'confirmed')->sum('paid_amount');
+            $s->total_paid = round((float) ($s->total_paid ?? 0) + (float) ($s->total_advances ?? 0) + $paidAtDelivery, 2);
             $s->last_purchase = Purchase::where('supplier_id', $s->id)->latest('purchase_date')->value('purchase_date');
             $s->last_payment = SupplierPayment::where('supplier_id', $s->id)->latest('payment_date')->value('payment_date');
+
             return $s;
         });
 
@@ -368,29 +368,37 @@ class SupplierService
             ->orderBy('id', 'asc')
             ->get();
 
-        $allPaymentsTotal = (float)SupplierPayment::where('supplier_id', $supplier->id)->sum('amount')
-            + (float)SupplierAdvance::where('supplier_id', $supplier->id)->sum('amount');
-        
+        $allPaymentsTotal = (float) SupplierPayment::where('supplier_id', $supplier->id)->sum('amount')
+            + (float) SupplierAdvance::where('supplier_id', $supplier->id)->sum('amount');
+
+        $openingBalance = (float) $supplier->opening_balance;
         $paymentPool = $allPaymentsTotal;
+
+        // Opening balance due must be settled first from the payment pool before subsequent bills
+        if ($openingBalance > 0) {
+            $allocatedToOpening = min($openingBalance, $paymentPool);
+            $paymentPool = max(0, round($paymentPool - $allocatedToOpening, 2));
+        }
+
         $billAllocations = [];
 
         foreach ($allPurchases as $p) {
-            $unpaidAtDelivery = max(0, (float)$p->total_amount - (float)$p->paid_amount);
+            $unpaidAtDelivery = max(0, (float) $p->total_amount - (float) $p->paid_amount);
             $allocatedFromPool = min($unpaidAtDelivery, $paymentPool);
             $paymentPool = max(0, round($paymentPool - $allocatedFromPool, 2));
 
-            $totalBillPaid = round((float)$p->paid_amount + $allocatedFromPool, 2);
-            $remainingBillDue = max(0, round((float)$p->total_amount - $totalBillPaid, 2));
+            $totalBillPaid = round((float) $p->paid_amount + $allocatedFromPool, 2);
+            $remainingBillDue = max(0, round((float) $p->total_amount - $totalBillPaid, 2));
 
             $status = 'unpaid';
-            if ($remainingBillDue <= 0 && (float)$p->total_amount > 0) {
+            if ($remainingBillDue <= 0 && (float) $p->total_amount > 0) {
                 $status = 'paid';
             } elseif ($totalBillPaid > 0) {
                 $status = 'partially_paid';
             }
 
             $billAllocations[$p->id] = [
-                'paid_at_delivery' => (float)$p->paid_amount,
+                'paid_at_delivery' => (float) $p->paid_amount,
                 'allocated_payments' => $allocatedFromPool,
                 'total_paid' => $totalBillPaid,
                 'remaining_due' => $remainingBillDue,
@@ -401,18 +409,18 @@ class SupplierService
         $rows = collect();
 
         foreach ($purchases as $p) {
-            $itemSummary = $p->items->map(fn ($it) => $it->product->name . ' (' . (float)$it->purchase_quantity . ' ' . $it->purchase_unit . ' @ ৳' . (float)$it->unit_price . ')')->join(', ');
-            $unpaid = (float)$p->total_amount - (float)$p->paid_amount;
+            $itemSummary = $p->items->map(fn ($it) => $it->product->name.' ('.(float) $it->purchase_quantity.' '.$it->purchase_unit.' @ ৳'.(float) $it->unit_price.')')->join(', ');
+            $unpaid = (float) $p->total_amount - (float) $p->paid_amount;
             $alloc = $billAllocations[$p->id] ?? null;
 
             $rows->push([
                 'date' => $p->purchase_date->toDateString(),
                 'type' => 'purchase_bill',
                 'reference' => $p->invoice_no,
-                'description' => 'Goods Received: ' . ($itemSummary ?: 'Kitchen Raw Materials'),
-                'bill_amount' => (float)$p->total_amount,
-                'paid_amount' => (float)$p->paid_amount,
-                'total_bill_paid' => $alloc ? $alloc['total_paid'] : (float)$p->paid_amount,
+                'description' => 'Goods Received: '.($itemSummary ?: 'Kitchen Raw Materials'),
+                'bill_amount' => (float) $p->total_amount,
+                'paid_amount' => (float) $p->paid_amount,
+                'total_bill_paid' => $alloc ? $alloc['total_paid'] : (float) $p->paid_amount,
                 'remaining_bill_due' => $alloc ? $alloc['remaining_due'] : $unpaid,
                 'bill_status' => $alloc ? $alloc['status'] : ($unpaid <= 0 ? 'paid' : 'unpaid'),
                 'net_effect' => $unpaid,
@@ -427,10 +435,10 @@ class SupplierService
                 'date' => $pay->payment_date->toDateString(),
                 'type' => 'payment_voucher',
                 'reference' => $pay->voucher_no,
-                'description' => 'Payment Voucher via ' . $accName . ($pay->notes ? ' (' . $pay->notes . ')' : ''),
+                'description' => 'Payment Voucher via '.$accName.($pay->notes ? ' ('.$pay->notes.')' : ''),
                 'bill_amount' => 0.00,
-                'paid_amount' => (float)$pay->amount,
-                'net_effect' => -((float)$pay->amount),
+                'paid_amount' => (float) $pay->amount,
+                'net_effect' => -((float) $pay->amount),
                 'items' => [],
                 'created_at' => $pay->created_at,
             ]);
@@ -442,18 +450,36 @@ class SupplierService
                 'date' => $adv->advance_date->toDateString(),
                 'type' => 'advance_voucher',
                 'reference' => $adv->voucher_no,
-                'description' => 'Supplier Advance via ' . $accName . ($adv->reason ? ' (' . $adv->reason . ')' : ''),
+                'description' => 'Supplier Advance via '.$accName.($adv->reason ? ' ('.$adv->reason.')' : ''),
                 'bill_amount' => 0.00,
-                'paid_amount' => (float)$adv->amount,
-                'net_effect' => -((float)$adv->amount),
+                'paid_amount' => (float) $adv->amount,
+                'net_effect' => -((float) $adv->amount),
                 'items' => [],
                 'created_at' => $adv->created_at,
             ]);
         }
 
-        $sortedRows = $rows->sortBy(fn ($r) => $r['date'] . '_' . $r['created_at'])->values();
+        $sortedRows = $rows->sortBy(fn ($r) => $r['date'].'_'.$r['created_at'])->values();
 
-        $runningBalance = (float)$supplier->opening_balance;
+        $runningBalance = (float) $supplier->opening_balance;
+        if ($startDate) {
+            $priorPurchasesNet = (float) (Purchase::where('supplier_id', $supplier->id)
+                ->whereDate('purchase_date', '<', $startDate)
+                ->where('status', 'confirmed')
+                ->selectRaw('SUM(total_amount - paid_amount) as net')
+                ->value('net') ?? 0.0);
+
+            $priorPayments = (float) SupplierPayment::where('supplier_id', $supplier->id)
+                ->whereDate('payment_date', '<', $startDate)
+                ->sum('amount');
+
+            $priorAdvances = (float) SupplierAdvance::where('supplier_id', $supplier->id)
+                ->whereDate('advance_date', '<', $startDate)
+                ->sum('amount');
+
+            $runningBalance = round((float) $supplier->opening_balance + $priorPurchasesNet - $priorPayments - $priorAdvances, 2);
+        }
+
         $statementRows = [];
 
         foreach ($sortedRows as $row) {
@@ -464,8 +490,8 @@ class SupplierService
 
         return [
             'supplier' => $supplier,
-            'opening_balance' => (float)$supplier->opening_balance,
-            'current_balance' => (float)$supplier->current_balance,
+            'opening_balance' => (float) $supplier->opening_balance,
+            'current_balance' => (float) $supplier->current_balance,
             'total_purchased' => round($purchases->sum('total_amount'), 2),
             'total_paid' => round($purchases->sum('paid_amount') + $payments->sum('amount') + $advances->sum('amount'), 2),
             'statement_rows' => $statementRows,

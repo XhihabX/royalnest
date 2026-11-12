@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
-use App\Models\Category;
 use App\Models\FinancialAccount;
 use App\Models\Product;
 use App\Models\Role;
@@ -55,11 +54,11 @@ class FoundationDatabaseTest extends TestCase
         $this->assertNotNull($cardamom);
         $this->assertEquals('g', $cardamom->base_unit);
         $this->assertEquals('kg', $cardamom->purchase_unit);
-        $this->assertEquals(100.0, (float)$cardamom->current_stock);
+        $this->assertEquals(100.0, (float) $cardamom->current_stock);
 
         $conv = $cardamom->unitConversions()->first();
         $this->assertNotNull($conv);
-        $this->assertEquals(1000.0, (float)$conv->multiplier_to_base);
+        $this->assertEquals(1000.0, (float) $conv->multiplier_to_base);
     }
 
     public function test_audit_logger_creates_immutable_log(): void

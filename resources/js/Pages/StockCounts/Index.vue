@@ -3,6 +3,9 @@ import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { ClipboardCheck, Plus, AlertTriangle, CheckCircle2, Trash2 } from 'lucide-vue-next';
+import { useI18n } from '@/Composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
     counts: Array,
@@ -52,9 +55,9 @@ const submit = () => {
     <AppLayout title="Physical Stock Count & Audit">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-white tracking-tight">Physical Stock Count & Reconciliation</h1>
+                <h1 class="text-2xl font-bold text-white tracking-tight">{{ t('stock_counts', 'Physical Stock Count & Reconciliation') }}</h1>
                 <p class="text-xs text-slate-400 mt-1">
-                    Periodic physical counting vs perpetual system stock balances with traceable adjustment audit trails.
+                    {{ t('stock_counts_desc', 'Periodic physical counting vs perpetual system stock balances with traceable adjustment audit trails.') }}
                 </p>
             </div>
 
@@ -63,7 +66,7 @@ const submit = () => {
                 class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer"
             >
                 <Plus class="w-4 h-4" />
-                <span>New Count Session</span>
+                <span>{{ t('new_stock_count', 'New Count Session') }}</span>
             </button>
         </div>
 

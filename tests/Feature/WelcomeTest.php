@@ -14,7 +14,7 @@ class WelcomeTest extends TestCase
     public function test_dashboard_renders_cleanly_with_inertia(): void
     {
         $user = User::factory()->create([
-            'email' => 'test_' . uniqid() . '@royalnest.com',
+            'email' => 'test_'.uniqid().'@royalnest.com',
             'primary_role' => 'owner',
         ]);
 

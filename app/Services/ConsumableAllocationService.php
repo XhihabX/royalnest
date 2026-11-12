@@ -6,7 +6,6 @@ use App\Models\ConsumableAllocation;
 use App\Models\Product;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ConsumableAllocationService
@@ -25,7 +24,7 @@ class ConsumableAllocationService
     ): ConsumableAllocation {
         if ($durationDays <= 0) {
             throw ValidationException::withMessages([
-                'duration_days' => 'Duration days must be at least 1 day.'
+                'duration_days' => 'Duration days must be at least 1 day.',
             ]);
         }
 
@@ -72,4 +71,3 @@ class ConsumableAllocationService
         return round($total, 2);
     }
 }
-

@@ -43,12 +43,12 @@ class DailySalesController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $total = (float)$validated['total_sales'];
-        $cash = (float)($validated['cash_sales'] ?? 0);
-        $bkash = (float)($validated['bkash_sales'] ?? 0);
-        $nagad = (float)($validated['nagad_sales'] ?? 0);
-        $card = (float)($validated['card_bank_sales'] ?? 0);
-        $other = (float)($validated['other_sales'] ?? 0);
+        $total = (float) $validated['total_sales'];
+        $cash = (float) ($validated['cash_sales'] ?? 0);
+        $bkash = (float) ($validated['bkash_sales'] ?? 0);
+        $nagad = (float) ($validated['nagad_sales'] ?? 0);
+        $card = (float) ($validated['card_bank_sales'] ?? 0);
+        $other = (float) ($validated['other_sales'] ?? 0);
 
         $breakdownSum = $cash + $bkash + $nagad + $card + $other;
         $discrepancy = round($total - $breakdownSum, 2);
@@ -80,9 +80,9 @@ class DailySalesController extends Controller
                 $acc = FinancialAccount::lockForUpdate()->find($oldTxn->financial_account_id);
                 if ($acc) {
                     if ($oldTxn->type === 'deposit') {
-                        $acc->current_balance = round((float)$acc->current_balance - (float)$oldTxn->amount, 2);
+                        $acc->current_balance = round((float) $acc->current_balance - (float) $oldTxn->amount, 2);
                     } elseif ($oldTxn->type === 'withdrawal') {
-                        $acc->current_balance = round((float)$acc->current_balance + (float)$oldTxn->amount, 2);
+                        $acc->current_balance = round((float) $acc->current_balance + (float) $oldTxn->amount, 2);
                     }
                     $acc->save();
                 }
@@ -152,13 +152,28 @@ class DailySalesController extends Controller
                     );
                 }
             }
+
+            if ($other > 0) {
+                $otherAccount = FinancialAccount::where('type', 'other')->where('is_active', true)->first()
+                    ?? FinancialAccount::where('type', 'cash')->where('is_active', true)->first();
+                if ($otherAccount) {
+                    $this->financialAccountService->deposit(
+                        accountId: $otherAccount->id,
+                        amount: $other,
+                        date: $salesDate,
+                        referenceType: DailySale::class,
+                        referenceId: $dailySale->id,
+                        userId: $userId,
+                        notes: "Daily other channel sales settlement for {$salesDate}"
+                    );
+                }
+            }
         });
 
-        $msg = $discrepancy == 0 
+        $msg = $discrepancy == 0
             ? 'Daily sales entry saved and cash deposited into financial accounts with ৳0 discrepancy.'
             : "Daily sales saved and deposited with discrepancy of ৳{$discrepancy} flagged for manager review.";
 
         return redirect()->back()->with('success', $msg);
     }
 }
-

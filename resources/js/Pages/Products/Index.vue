@@ -3,6 +3,9 @@ import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Boxes, Plus, AlertCircle, Check } from 'lucide-vue-next';
+import { useI18n } from '@/Composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
     products: Array,
@@ -58,9 +61,9 @@ const submit = () => {
     <AppLayout title="Products & Inventory Master">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-white tracking-tight">Products & Ingredients Master</h1>
+                <h1 class="text-2xl font-bold text-white tracking-tight">{{ t('products', 'Products & Ingredients Master') }}</h1>
                 <p class="text-xs text-slate-400 mt-1">
-                    Manage base units, configurable purchase conversions, moving weighted-average costs, and reorder alerts.
+                    {{ t('products_desc', 'Manage base units, configurable purchase conversions, moving weighted-average costs, and reorder alerts.') }}
                 </p>
             </div>
 
@@ -69,7 +72,7 @@ const submit = () => {
                 class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer"
             >
                 <Plus class="w-4 h-4" />
-                <span>Add Product</span>
+                <span>{{ t('add_product', 'Add Product') }}</span>
             </button>
         </div>
 
@@ -79,14 +82,14 @@ const submit = () => {
                 <table class="w-full text-left text-xs">
                     <thead>
                         <tr class="text-slate-400 bg-slate-950/60 border-b border-slate-800 font-semibold">
-                            <th class="py-3 px-4">Item Name</th>
-                            <th class="py-3 px-4">Category</th>
-                            <th class="py-3 px-4">Base Unit</th>
-                            <th class="py-3 px-4">Purchase Unit</th>
-                            <th class="py-3 px-4 text-right">On-Hand Stock</th>
+                            <th class="py-3 px-4">{{ t('product_name', 'Item Name') }}</th>
+                            <th class="py-3 px-4">{{ t('category', 'Category') }}</th>
+                            <th class="py-3 px-4">{{ t('base_unit', 'Base Unit') }}</th>
+                            <th class="py-3 px-4">{{ t('purchase_unit', 'Purchase Unit') }}</th>
+                            <th class="py-3 px-4 text-right">{{ t('current_stock', 'On-Hand Stock') }}</th>
                             <th class="py-3 px-4">Active FIFO Batches (Price by Lot)</th>
                             <th class="py-3 px-4 text-right">FIFO Inventory Value</th>
-                            <th class="py-3 px-4 text-center">Status</th>
+                            <th class="py-3 px-4 text-center">{{ t('status', 'Status') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/60">

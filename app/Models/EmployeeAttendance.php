@@ -18,7 +18,7 @@ class EmployeeAttendance extends Model
     ];
 
     protected $casts = [
-        'attendance_date' => 'date',
+        'attendance_date' => 'date:Y-m-d',
     ];
 
     public function employee(): BelongsTo
@@ -26,4 +26,3 @@ class EmployeeAttendance extends Model
         return $this->belongsTo(Employee::class);
     }
 }
-

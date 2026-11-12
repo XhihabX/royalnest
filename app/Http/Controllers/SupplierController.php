@@ -205,9 +205,9 @@ class SupplierController extends Controller
 
         $payment = $this->supplierService->paySupplierDue(
             supplierId: $supplier->id,
-            amount: (float)$validated['amount'],
+            amount: (float) $validated['amount'],
             paymentDate: $validated['payment_date'],
-            paymentAccountId: !empty($validated['payment_account_id']) ? (int)$validated['payment_account_id'] : null,
+            paymentAccountId: ! empty($validated['payment_account_id']) ? (int) $validated['payment_account_id'] : null,
             paymentMethod: $validated['payment_method'],
             notes: $validated['notes'] ?? null,
             userId: $userId
@@ -233,9 +233,9 @@ class SupplierController extends Controller
 
         $advance = $this->supplierService->recordAdvance(
             supplierId: $supplier->id,
-            amount: (float)$validated['amount'],
+            amount: (float) $validated['amount'],
             advanceDate: $validated['advance_date'],
-            paymentAccountId: !empty($validated['payment_account_id']) ? (int)$validated['payment_account_id'] : null,
+            paymentAccountId: ! empty($validated['payment_account_id']) ? (int) $validated['payment_account_id'] : null,
             paymentMethod: $validated['payment_method'],
             reason: $validated['reason'] ?? null,
             userId: $userId

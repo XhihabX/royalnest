@@ -55,4 +55,3 @@ class ConsumptionController extends Controller
         return redirect()->back()->with('success', 'Daily consumption recorded and deducted from perpetual stock.');
     }
 }
-

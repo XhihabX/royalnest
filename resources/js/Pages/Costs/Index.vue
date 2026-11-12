@@ -1,0 +1,750 @@
+<script setup>
+import { ref, computed, watch } from 'vue';
+import { useForm, router, Head } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import { 
+    Mic, 
+    MicOff, 
+    Sparkles, 
+    Star, 
+    Clock, 
+    Flame, 
+    Truck, 
+    Receipt, 
+    Users, 
+    Wallet, 
+    Plus, 
+    Search, 
+    Trash2, 
+    CheckCircle2, 
+    AlertCircle, 
+    RotateCcw, 
+    ArrowRight,
+    Store,
+    Layers,
+    X,
+    Check
+} from 'lucide-vue-next';
+import { useI18n } from '@/Composables/useI18n';
+import { useVoiceCostParser } from '@/Composables/useVoiceCostParser';
+
+const props = defineProps({
+    templates: Object,
+    products: Array,
+    categories: Array,
+    suppliers: Array,
+    employees: Array,
+    accounts: Array,
+    recentPurchases: Array,
+    recentExpenses: Array,
+    selectedDate: String,
+    filters: Object,
+});
+
+const { t } = useI18n();
+const { 
+    isListening, 
+    transcript, 
+    interimTranscript, 
+    voiceLanguage, 
+    errorMessage: voiceError, 
+    isSupported: voiceSupported, 
+    startListening, 
+    stopListening, 
+    clearVoiceInput, 
+    parseCostSpeech 
+} = useVoiceCostParser();
+
+const searchShortcut = ref(props.filters.search || '');
+const activeTab = ref('purchase'); // purchase, consumption, expense, salary_payment, salary_advance, supplier_payment, other
+const voicePreview = ref(null);
+const showVoiceBox = ref(false);
+
+const form = useForm({
+    transaction_type: 'purchase',
+    transaction_date: props.selectedDate || new Date().toISOString().split('T')[0],
+    name: '',
+    product_id: '',
+    category_id: '',
+    supplier_id: '',
+    employee_id: '',
+    expense_category: 'electricity',
+    quantity: 1,
+    unit: 'kg',
+    unit_price: 0,
+    amount: 0,
+    paid_amount: 0,
+    payment_account_id: props.accounts[0]?.id || '',
+    is_purchase_and_consume: false,
+    recover_advances: true,
+    salary_month: new Date().toISOString().slice(0, 7),
+    notes: '',
+    save_as_template: false,
+    template_id: null,
+    is_favorite: false,
+});
+
+// Sync form transaction type with active tab
+watch(activeTab, (newTab) => {
+    form.transaction_type = newTab;
+});
+
+// Auto calculate Total Amount = Qty * Unit Price for purchases
+const computedTotal = computed(() => {
+    if (['purchase', 'consumption'].includes(form.transaction_type)) {
+        const q = parseFloat(form.quantity) || 0;
+        const p = parseFloat(form.unit_price) || 0;
+        return Number((q * p).toFixed(2));
+    }
+    return Number((parseFloat(form.amount) || 0).toFixed(2));
+});
+
+// Auto-sync computed total to paid_amount by default
+watch(computedTotal, (newTotal) => {
+    if (form.transaction_type === 'purchase') {
+        form.paid_amount = newTotal;
+    } else {
+        form.amount = newTotal;
+    }
+});
+
+// Voice Input: when transcript finishes, parse speech into form fields
+watch(transcript, (newText) => {
+    if (newText) {
+        const parsed = parseCostSpeech(newText);
+        voicePreview.value = parsed;
+    }
+});
+
+const applyVoiceToForm = () => {
+    if (!voicePreview.value) return;
+    const p = voicePreview.value;
+
+    if (p.transaction_type) {
+        activeTab.value = p.transaction_type;
+        form.transaction_type = p.transaction_type;
+    }
+
+    if (p.name) {
+        form.name = p.name;
+        // Attempt product match
+        const matchedProd = props.products.find(prod => 
+            prod.name.toLowerCase().includes(p.name.toLowerCase()) || 
+            p.name.toLowerCase().includes(prod.name.toLowerCase())
+        );
+        if (matchedProd) {
+            form.product_id = matchedProd.id;
+            form.unit = matchedProd.purchase_unit || matchedProd.base_unit;
+        }
+    }
+
+    if (p.quantity) form.quantity = p.quantity;
+    if (p.unit) form.unit = p.unit;
+    if (p.unit_price) form.unit_price = p.unit_price;
+    if (p.amount) {
+        form.amount = p.amount;
+        form.paid_amount = p.amount;
+    }
+    if (p.expense_category) form.expense_category = p.expense_category;
+
+    // Match payment account
+    if (p.payment_method) {
+        const matchedAcc = props.accounts.find(a => a.type === p.payment_method) || props.accounts[0];
+        if (matchedAcc) form.payment_account_id = matchedAcc.id;
+    }
+
+    if (p.notes) form.notes = p.notes;
+
+    showVoiceBox.value = false;
+    clearVoiceInput();
+    voicePreview.value = null;
+};
+
+// Apply saved shortcut template to the form
+const selectShortcut = (tpl) => {
+    activeTab.value = tpl.transaction_type;
+    form.transaction_type = tpl.transaction_type;
+    form.template_id = tpl.id;
+    form.name = tpl.name;
+    form.product_id = tpl.product_id || '';
+    form.category_id = tpl.category_id || '';
+    form.supplier_id = tpl.supplier_id || '';
+    form.employee_id = tpl.employee_id || '';
+    form.expense_category = tpl.expense_category || 'misc';
+    form.unit = tpl.default_unit || 'kg';
+    form.unit_price = Number(tpl.last_unit_price) || 0;
+    form.quantity = 1;
+    if (tpl.default_payment_account_id) {
+        form.payment_account_id = tpl.default_payment_account_id;
+    }
+
+    // If product is linked, populate units and rates
+    if (tpl.product) {
+        form.unit = tpl.product.purchase_unit || tpl.product.base_unit;
+        if (!tpl.last_unit_price || tpl.last_unit_price == 0) {
+            const mult = tpl.product.unit_conversions?.[0]?.multiplier_to_base || 1;
+            form.unit_price = Number((Number(tpl.product.cost_price) * mult).toFixed(2));
+        }
+    }
+};
+
+const onProductSelect = () => {
+    const prod = props.products.find(p => p.id === form.product_id);
+    if (prod) {
+        form.name = prod.name;
+        form.unit = prod.purchase_unit || prod.base_unit;
+        const mult = prod.unit_conversions?.[0]?.multiplier_to_base || 1;
+        form.unit_price = Number((Number(prod.cost_price) * mult).toFixed(2));
+        if (prod.supplier_id) form.supplier_id = prod.supplier_id;
+        if (prod.category_id) form.category_id = prod.category_id;
+    }
+};
+
+const submit = () => {
+    form.post('/daily-costs', {
+        onSuccess: () => {
+            form.reset('name', 'product_id', 'quantity', 'unit_price', 'amount', 'paid_amount', 'notes', 'save_as_template', 'template_id');
+            form.quantity = 1;
+            form.paid_amount = 0;
+        }
+    });
+};
+
+const toggleFav = (tplId) => {
+    router.post(`/daily-costs/templates/${tplId}/favorite`, {}, { preserveScroll: true });
+};
+</script>
+
+<template>
+    <AppLayout title="Smart Daily Cost Entry">
+        <Head title="Smart Cost Entry & Voice Typing — Royal Nest" />
+
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                    <Sparkles class="w-6 h-6 text-amber-400" />
+                    <span>{{ t('smart_cost_entry', 'Smart Daily Cost Entry') }}</span>
+                </h1>
+                <p class="text-xs text-slate-400 mt-1">
+                    {{ t('smart_cost_desc', 'Ultra-fast daily cost recording with voice typing, reusable shortcuts, and automated financial synchronization.') }}
+                </p>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <!-- Voice Typing Toggle Button -->
+                <button
+                    type="button"
+                    @click="showVoiceBox = !showVoiceBox"
+                    :class="[
+                        'inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-lg cursor-pointer border',
+                        isListening
+                            ? 'bg-rose-600 text-white border-rose-500 animate-pulse shadow-rose-600/30'
+                            : 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-400/80 shadow-amber-500/20'
+                    ]"
+                >
+                    <Mic v-if="!isListening" class="w-4 h-4" />
+                    <MicOff v-else class="w-4 h-4" />
+                    <span>{{ isListening ? 'রেকর্ডিং হচ্ছে (Listening...)' : 'ভয়েস টাইপিং (Voice Input)' }}</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Voice Assistant Panel (When toggled or active) -->
+        <div v-if="showVoiceBox" class="bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/30 rounded-2xl p-5 mb-6 shadow-xl animate-fade-in">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full" :class="isListening ? 'bg-rose-500 animate-ping' : 'bg-amber-400'"></div>
+                    <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">Browser Web Speech Assistant</span>
+                    <span class="text-[11px] text-slate-400 font-mono">(100% Free • No External API Required)</span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <select
+                        v-model="voiceLanguage"
+                        class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] text-slate-200 font-medium focus:outline-none"
+                    >
+                        <option value="bn-BD">বাংলা (Bengali)</option>
+                        <option value="en-US">English (US)</option>
+                    </select>
+
+                    <button 
+                        @click="showVoiceBox = false" 
+                        class="text-slate-400 hover:text-white p-1 rounded-lg"
+                    >
+                        <X class="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
+            <!-- Listening Status & Waveform -->
+            <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-4 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs text-slate-400">
+                        {{ isListening ? 'বলুন... (Speak naturally, e.g. "আজকে পাঁচ কেজি শসা কিনেছি, প্রতি কেজি চল্লিশ টাকা")' : 'মাইক্রোফোনে ক্লিক করে কথা বলুন' }}
+                    </span>
+                    <div class="flex items-center gap-2">
+                        <button
+                            v-if="!isListening"
+                            type="button"
+                            @click="startListening"
+                            class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                        >
+                            <Mic class="w-3.5 h-3.5" />
+                            <span>Start Dictation</span>
+                        </button>
+                        <button
+                            v-else
+                            type="button"
+                            @click="stopListening"
+                            class="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                        >
+                            <MicOff class="w-3.5 h-3.5" />
+                            <span>Stop</span>
+                        </button>
+                        <button
+                            type="button"
+                            @click="clearVoiceInput"
+                            class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div class="text-sm font-medium text-white min-h-[38px] flex items-center">
+                    <span v-if="transcript" class="text-white">{{ transcript }}</span>
+                    <span v-else-if="interimTranscript" class="text-slate-400 italic">{{ interimTranscript }}</span>
+                    <span v-else class="text-slate-600 italic">Dictated speech will appear here...</span>
+                </div>
+
+                <div v-if="voiceError" class="mt-2 text-xs text-rose-400 flex items-center gap-1.5">
+                    <AlertCircle class="w-3.5 h-3.5" />
+                    <span>{{ voiceError }}</span>
+                </div>
+            </div>
+
+            <!-- Parsed Preview & Fill Form Button -->
+            <div v-if="voicePreview" class="bg-slate-900 border border-amber-500/20 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="text-amber-400 font-bold uppercase tracking-wider text-[11px]">Interpreted:</span>
+                    <span v-if="voicePreview.name" class="bg-slate-800 text-white px-2 py-0.5 rounded font-medium">Item: {{ voicePreview.name }}</span>
+                    <span v-if="voicePreview.quantity" class="bg-slate-800 text-white px-2 py-0.5 rounded font-mono">Qty: {{ voicePreview.quantity }} {{ voicePreview.unit }}</span>
+                    <span v-if="voicePreview.unit_price" class="bg-slate-800 text-white px-2 py-0.5 rounded font-mono">Rate: ৳{{ voicePreview.unit_price }}</span>
+                    <span v-if="voicePreview.amount" class="bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded font-mono font-bold">Total: ৳{{ voicePreview.amount }}</span>
+                    <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded">Type: {{ voicePreview.transaction_type }}</span>
+                    <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded">Account: {{ voicePreview.payment_method }}</span>
+                </div>
+
+                <button
+                    type="button"
+                    @click="applyVoiceToForm"
+                    class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition cursor-pointer"
+                >
+                    <Check class="w-4 h-4" />
+                    <span>Apply to Form (ফর্ম পূরণ করুন)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Saved Shortcuts & Quick Templates Bar -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <Star class="w-4 h-4 text-amber-400 fill-amber-400" />
+                    <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider">{{ t('quick_shortcuts', 'Quick Entry Shortcuts') }}</h2>
+                    <span class="text-[11px] text-slate-400 font-medium">(1-Tap pre-fill)</span>
+                </div>
+
+                <div class="relative w-48 sm:w-64">
+                    <Search class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+                    <input 
+                        type="text" 
+                        v-model="searchShortcut"
+                        placeholder="Search shortcut items..."
+                        class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                </div>
+            </div>
+
+            <!-- Shortcuts Carousel / Pills -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                <!-- Favorite Shortcuts -->
+                <button
+                    v-for="tpl in templates.favorites"
+                    :key="'fav-' + tpl.id"
+                    type="button"
+                    @click="selectShortcut(tpl)"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-xs font-medium text-amber-200 shrink-0 transition group cursor-pointer"
+                >
+                    <span class="text-amber-400">★</span>
+                    <span class="font-bold text-white">{{ tpl.name }}</span>
+                    <span v-if="tpl.last_unit_price > 0" class="text-[11px] text-amber-400 font-mono">৳{{ Number(tpl.last_unit_price).toFixed(0) }}/{{ tpl.default_unit }}</span>
+                </button>
+
+                <!-- Frequently & Recently Used -->
+                <button
+                    v-for="tpl in templates.frequently_used"
+                    :key="'freq-' + tpl.id"
+                    type="button"
+                    @click="selectShortcut(tpl)"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 text-xs font-medium text-slate-200 shrink-0 transition cursor-pointer"
+                >
+                    <span class="text-slate-400">⚡</span>
+                    <span class="font-semibold text-white">{{ tpl.name }}</span>
+                    <span v-if="tpl.last_unit_price > 0" class="text-[11px] text-slate-400 font-mono">৳{{ Number(tpl.last_unit_price).toFixed(0) }}</span>
+                </button>
+
+                <div v-if="templates.favorites.length === 0 && templates.frequently_used.length === 0" class="text-xs text-slate-500 italic py-1">
+                    No shortcuts yet. Check "Save as Quick Template" below to pin your everyday purchases.
+                </div>
+            </div>
+        </div>
+
+        <!-- 2 Column Layout: Form Left, Recent Entries Right -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left 2 Cols: Main Fast Entry Form -->
+            <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <!-- Transaction Type Tabs -->
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-3 mb-5 border-b border-slate-800/80 scrollbar-none">
+                    <button
+                        type="button"
+                        @click="activeTab = 'purchase'"
+                        :class="[
+                            'px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer',
+                            activeTab === 'purchase' ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20' : 'bg-slate-950 border border-slate-800 text-slate-300 hover:text-white'
+                        ]"
+                    >
+                        <Truck class="w-3.5 h-3.5" />
+                        <span>{{ t('raw_material_purchase', 'Inventory Purchase') }}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="activeTab = 'expense'"
+                        :class="[
+                            'px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer',
+                            activeTab === 'expense' ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20' : 'bg-slate-950 border border-slate-800 text-slate-300 hover:text-white'
+                        ]"
+                    >
+                        <Receipt class="w-3.5 h-3.5" />
+                        <span>{{ t('operating_expense', 'General Expense') }}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="activeTab = 'consumption'"
+                        :class="[
+                            'px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer',
+                            activeTab === 'consumption' ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20' : 'bg-slate-950 border border-slate-800 text-slate-300 hover:text-white'
+                        ]"
+                    >
+                        <Flame class="w-3.5 h-3.5" />
+                        <span>{{ t('kitchen_consumption', 'Kitchen Usage') }}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="activeTab = 'salary_payment'"
+                        :class="[
+                            'px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer',
+                            activeTab === 'salary_payment' ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20' : 'bg-slate-950 border border-slate-800 text-slate-300 hover:text-white'
+                        ]"
+                    >
+                        <Users class="w-3.5 h-3.5" />
+                        <span>{{ t('salary_payment', 'Staff Salary') }}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="activeTab = 'salary_advance'"
+                        :class="[
+                            'px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer',
+                            activeTab === 'salary_advance' ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20' : 'bg-slate-950 border border-slate-800 text-slate-300 hover:text-white'
+                        ]"
+                    >
+                        <Wallet class="w-3.5 h-3.5" />
+                        <span>{{ t('salary_advance', 'Staff Advance') }}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="activeTab = 'supplier_payment'"
+                        :class="[
+                            'px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer',
+                            activeTab === 'supplier_payment' ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20' : 'bg-slate-950 border border-slate-800 text-slate-300 hover:text-white'
+                        ]"
+                    >
+                        <Store class="w-3.5 h-3.5" />
+                        <span>{{ t('supplier_payment', 'Supplier Due Payment') }}</span>
+                    </button>
+                </div>
+
+                <form @submit.prevent="submit" class="space-y-4 text-xs">
+                    <!-- Row 1: Date & Primary Entity -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-slate-300 font-medium mb-1">{{ t('date', 'Transaction Date') }}</label>
+                            <input 
+                                type="date" 
+                                v-model="form.transaction_date" 
+                                required
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                            />
+                        </div>
+
+                        <!-- Product Selector (For Purchase or Consumption) -->
+                        <div v-if="['purchase', 'consumption'].includes(form.transaction_type)">
+                            <label class="block text-slate-300 font-medium mb-1">{{ t('product_name', 'Select Product / Ingredient') }}</label>
+                            <select 
+                                v-model="form.product_id" 
+                                @change="onProductSelect"
+                                required
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                            >
+                                <option value="" disabled>Choose Product</option>
+                                <option v-for="p in products" :key="p.id" :value="p.id">
+                                    {{ p.name }} (Stock: {{ Number(p.current_stock).toFixed(1) }} {{ p.base_unit }})
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Employee Selector (For Salary or Advance) -->
+                        <div v-else-if="['salary_payment', 'salary_advance'].includes(form.transaction_type)">
+                            <label class="block text-slate-300 font-medium mb-1">{{ t('staff_name', 'Select Staff / Employee') }}</label>
+                            <select 
+                                v-model="form.employee_id" 
+                                required
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                            >
+                                <option value="" disabled>Choose Employee</option>
+                                <option v-for="e in employees" :key="e.id" :value="e.id">
+                                    {{ e.name }} ({{ e.role }} • ৳{{ e.agreed_salary }})
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Supplier Selector (For Supplier Payment) -->
+                        <div v-else-if="form.transaction_type === 'supplier_payment'">
+                            <label class="block text-slate-300 font-medium mb-1">{{ t('supplier', 'Select Supplier / Dealer') }}</label>
+                            <select 
+                                v-model="form.supplier_id" 
+                                required
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                            >
+                                <option value="" disabled>Choose Supplier</option>
+                                <option v-for="s in suppliers" :key="s.id" :value="s.id">
+                                    {{ s.name }} (Due: ৳{{ Number(s.current_balance).toFixed(2) }})
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Expense Category (For General Expense) -->
+                        <div v-else-if="form.transaction_type === 'expense'">
+                            <label class="block text-slate-300 font-medium mb-1">{{ t('expense_category', 'Expense Category') }}</label>
+                            <select 
+                                v-model="form.expense_category" 
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                            >
+                                <option value="electricity">Electricity Bill (বিদ্যুৎ বিল)</option>
+                                <option value="gas">Gas Bill (গ্যাস বিল)</option>
+                                <option value="rent">Shop Rent (দোকান ভাড়া)</option>
+                                <option value="cleaning">Cleaning Supplies (পরিচ্ছন্নতা)</option>
+                                <option value="transport">Transportation (যাতায়াত)</option>
+                                <option value="repairs">Repairs & Maintenance (মেরামত)</option>
+                                <option value="marketing">Marketing & Promotion (বিজ্ঞাপন)</option>
+                                <option value="misc">Miscellaneous (বিবিধ)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Purchase Specifics (Qty, Unit, Rate, Total) -->
+                    <div v-if="['purchase', 'consumption'].includes(form.transaction_type)" class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                        <div>
+                            <label class="block text-slate-400 mb-1 font-medium">{{ t('quantity', 'Quantity') }}</label>
+                            <input 
+                                type="number" 
+                                step="any" 
+                                v-model="form.quantity" 
+                                required
+                                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:border-amber-500 focus:outline-none"
+                            />
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-400 mb-1 font-medium">{{ t('purchase_unit', 'Unit') }}</label>
+                            <input 
+                                type="text" 
+                                v-model="form.unit" 
+                                placeholder="kg, pcs, L"
+                                required
+                                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white focus:border-amber-500 focus:outline-none"
+                            />
+                        </div>
+
+                        <div v-if="form.transaction_type === 'purchase'">
+                            <label class="block text-slate-400 mb-1 font-medium">{{ t('unit_price', 'Unit Price (৳)') }}</label>
+                            <input 
+                                type="number" 
+                                step="any" 
+                                v-model="form.unit_price" 
+                                required
+                                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono focus:border-amber-500 focus:outline-none"
+                            />
+                        </div>
+
+                        <div v-if="form.transaction_type === 'purchase'">
+                            <label class="block text-slate-400 mb-1 font-medium">{{ t('total', 'Total Cost (৳)') }}</label>
+                            <div class="w-full bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5 text-amber-300 font-mono font-bold">
+                                ৳ {{ computedTotal }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Direct Amount Entry for Expenses, Salaries, Supplier Payments -->
+                    <div v-if="!['purchase', 'consumption'].includes(form.transaction_type)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-slate-300 font-medium mb-1">{{ t('amount', 'Amount (৳)') }}</label>
+                            <input 
+                                type="number" 
+                                step="any" 
+                                v-model="form.amount" 
+                                required
+                                placeholder="0.00"
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono font-bold text-sm focus:border-amber-500 focus:outline-none"
+                            />
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-300 font-medium mb-1">Description / Payee Name</label>
+                            <input 
+                                type="text" 
+                                v-model="form.name" 
+                                placeholder="e.g. DESCO Electric, Staff name, Vendor"
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Payment Account & Supplier / Cash Options -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div v-if="form.transaction_type !== 'consumption'">
+                            <label class="block text-slate-300 font-medium mb-1">{{ t('payment_account', 'Payment Account') }}</label>
+                            <select 
+                                v-model="form.payment_account_id" 
+                                required
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                            >
+                                <option v-for="acc in accounts" :key="acc.id" :value="acc.id">
+                                    {{ acc.name }} ({{ acc.type.toUpperCase() }} • Bal: ৳{{ Number(acc.current_balance).toFixed(2) }})
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Immediate Cash Paid vs Credit for Purchase -->
+                        <div v-if="form.transaction_type === 'purchase'">
+                            <label class="block text-slate-300 font-medium mb-1">Immediate Cash Paid (৳)</label>
+                            <input 
+                                type="number" 
+                                step="any" 
+                                v-model="form.paid_amount" 
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                            />
+                            <span class="text-[10px] text-slate-400 mt-1 block">
+                                Remaining ৳{{ Math.max(0, computedTotal - (parseFloat(form.paid_amount) || 0)).toFixed(2) }} recorded as supplier payable due.
+                            </span>
+                        </div>
+
+                        <!-- Direct Purchase & Consume Checkbox -->
+                        <div v-if="form.transaction_type === 'purchase'" class="col-span-full pt-1">
+                            <label class="inline-flex items-center gap-2 cursor-pointer text-slate-300">
+                                <input type="checkbox" v-model="form.is_purchase_and_consume" class="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0" />
+                                <span class="font-medium text-amber-300">{{ t('direct_consume', 'Direct Purchase & Consume (Fresh market goods used today, ending stock +0)') }}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label class="block text-slate-300 font-medium mb-1">{{ t('notes', 'Notes / Remarks') }}</label>
+                        <input 
+                            type="text" 
+                            v-model="form.notes" 
+                            placeholder="Optional reference, voucher #, or invoice details"
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                        />
+                    </div>
+
+                    <!-- Save as Shortcut Toggle -->
+                    <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-slate-300">
+                            <input type="checkbox" v-model="form.save_as_template" class="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0" />
+                            <span class="font-medium">{{ t('save_as_shortcut', 'Save this item as Quick Shortcut template for 1-tap future entry') }}</span>
+                        </label>
+
+                        <div v-if="form.save_as_template" class="flex items-center gap-2">
+                            <label class="inline-flex items-center gap-1.5 text-xs text-amber-400">
+                                <input type="checkbox" v-model="form.is_favorite" class="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0" />
+                                <span>Star as Favorite</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button
+                        type="submit"
+                        :disabled="form.processing"
+                        class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-sm transition shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2 cursor-pointer mt-4"
+                    >
+                        <CheckCircle2 class="w-5 h-5" />
+                        <span>Confirm & Record Transaction (নিশ্চিত করুন)</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Right 1 Col: Recent Entries Stream for Today -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col h-full">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <Clock class="w-4 h-4 text-amber-400" />
+                        <h3 class="text-xs font-bold text-white uppercase tracking-wider">Recorded Today</h3>
+                    </div>
+                    <span class="text-[11px] text-slate-400 font-mono">{{ selectedDate }}</span>
+                </div>
+
+                <div class="space-y-3 overflow-y-auto max-h-[580px] pr-1 flex-1">
+                    <!-- Purchases -->
+                    <div v-for="p in recentPurchases" :key="'p-' + p.id" class="p-3 bg-slate-950 border border-slate-800/80 rounded-xl text-xs">
+                        <div class="flex items-center justify-between font-bold text-white mb-1">
+                            <span>{{ p.supplier?.name || 'Stock Purchase' }}</span>
+                            <span class="text-amber-400 font-mono">৳{{ p.total_amount }}</span>
+                        </div>
+                        <div class="text-[11px] text-slate-400">
+                            <span v-for="it in p.items" :key="it.id">
+                                {{ it.product?.name }} ({{ Number(it.purchase_quantity).toFixed(1) }} {{ it.purchase_unit }})
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between mt-2 pt-1 border-t border-slate-900 text-[10px] text-slate-500">
+                            <span>Paid: ৳{{ p.paid_amount }}</span>
+                            <span v-if="p.is_purchase_and_consume" class="text-amber-400">Direct Consumed</span>
+                        </div>
+                    </div>
+
+                    <!-- Expenses -->
+                    <div v-for="e in recentExpenses" :key="'e-' + e.id" class="p-3 bg-slate-950 border border-slate-800/80 rounded-xl text-xs">
+                        <div class="flex items-center justify-between font-bold text-white mb-1">
+                            <span class="capitalize">{{ e.category }} Expense</span>
+                            <span class="text-slate-300 font-mono">৳{{ e.amount }}</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400">{{ e.payee || e.notes || 'Operating expense' }}</p>
+                    </div>
+
+                    <div v-if="recentPurchases.length === 0 && recentExpenses.length === 0" class="text-center py-8 text-xs text-slate-500 italic">
+                        No transactions recorded for this date yet.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </AppLayout>
+</template>
+

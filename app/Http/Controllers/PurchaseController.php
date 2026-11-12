@@ -66,18 +66,17 @@ class PurchaseController extends Controller
                 'purchase_date' => $validated['purchase_date'],
                 'paid_amount' => $validated['paid_amount'] ?? 0.0,
                 'payment_account_id' => $validated['payment_account_id'] ?? null,
-                'is_purchase_and_consume' => !empty($validated['is_purchase_and_consume']),
+                'is_purchase_and_consume' => ! empty($validated['is_purchase_and_consume']),
                 'notes' => $validated['notes'] ?? null,
             ],
             items: $validated['items'],
             userId: auth()->id() ?: 1
         );
 
-        $msg = $purchase->is_purchase_and_consume 
-            ? "Purchase & Consume completed successfully. Stock received and consumed immediately with no duplicate expense."
-            : "Purchase recorded and confirmed. Stock and moving average cost updated.";
+        $msg = $purchase->is_purchase_and_consume
+            ? 'Purchase & Consume completed successfully. Stock received and consumed immediately with no duplicate expense.'
+            : 'Purchase recorded and confirmed. Stock and moving average cost updated.';
 
         return redirect()->back()->with('success', $msg);
     }
 }
-

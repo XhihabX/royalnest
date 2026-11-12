@@ -24,8 +24,8 @@ class ConsumableAllocation extends Model
     ];
 
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
+        'start_date' => 'date:Y-m-d',
+        'end_date' => 'date:Y-m-d',
         'total_cost' => 'decimal:2',
         'daily_allocated_cost' => 'decimal:2',
         'confirmed_actual_cost' => 'decimal:2',
@@ -41,4 +41,3 @@ class ConsumableAllocation extends Model
         return $this->belongsTo(Purchase::class);
     }
 }
-

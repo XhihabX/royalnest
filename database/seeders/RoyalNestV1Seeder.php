@@ -6,7 +6,6 @@ use App\Models\Branch;
 use App\Models\Category;
 use App\Models\Employee;
 use App\Models\FinancialAccount;
-use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductUnitConversion;
 use App\Models\Role;
@@ -278,4 +277,3 @@ class RoyalNestV1Seeder extends Seeder
         ]);
     }
 }
-

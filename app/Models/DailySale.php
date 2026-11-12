@@ -24,7 +24,7 @@ class DailySale extends Model
     ];
 
     protected $casts = [
-        'sales_date' => 'date',
+        'sales_date' => 'date:Y-m-d',
         'total_sales' => 'decimal:2',
         'cash_sales' => 'decimal:2',
         'bkash_sales' => 'decimal:2',
@@ -39,4 +39,3 @@ class DailySale extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 }
-

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\FinancialAccount;
-use App\Models\SalaryPayment;
 use App\Services\EmployeeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,9 +27,9 @@ class EmployeeController extends Controller
         $month = substr($date, 0, 7);
 
         $query = Employee::with([
-            'attendances' => fn($q) => $q->where('attendance_date', $date),
-            'salaryPayments' => fn($q) => $q->where('month_year', $month),
-            'advances' => fn($q) => $q->where('remaining_balance', '>', 0),
+            'attendances' => fn ($q) => $q->where('attendance_date', $date),
+            'salaryPayments' => fn ($q) => $q->where('month_year', $month),
+            'advances' => fn ($q) => $q->where('remaining_balance', '>', 0),
         ]);
 
         if ($status !== 'all') {
@@ -40,9 +39,9 @@ class EmployeeController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('employee_id', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('role', 'like', "%{$search}%");
+                    ->orWhere('employee_id', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('role', 'like', "%{$search}%");
             });
         }
 
@@ -218,10 +217,10 @@ class EmployeeController extends Controller
         $userId = auth()->id() ?? 1;
 
         $advance = $this->employeeService->issueAdvance(
-            employeeId: (int)$validated['employee_id'],
-            amount: (float)$validated['amount'],
+            employeeId: (int) $validated['employee_id'],
+            amount: (float) $validated['amount'],
             advanceDate: $validated['advance_date'],
-            paymentAccountId: (int)$validated['payment_account_id'],
+            paymentAccountId: (int) $validated['payment_account_id'],
             paymentMethod: $validated['payment_method'],
             reason: $validated['reason'] ?? null,
             userId: $userId
@@ -249,13 +248,13 @@ class EmployeeController extends Controller
         $userId = auth()->id() ?? 1;
 
         $payment = $this->employeeService->disburseSalary(
-            employeeId: (int)$validated['employee_id'],
-            grossAmount: (float)$validated['amount'],
+            employeeId: (int) $validated['employee_id'],
+            grossAmount: (float) $validated['amount'],
             paymentDate: $validated['payment_date'],
-            paymentAccountId: (int)$validated['payment_account_id'],
+            paymentAccountId: (int) $validated['payment_account_id'],
             paymentType: $validated['payment_type'],
             monthYear: $validated['month_year'],
-            advanceDeduction: (float)($validated['advance_deduction'] ?? 0),
+            advanceDeduction: (float) ($validated['advance_deduction'] ?? 0),
             notes: $validated['notes'] ?? null,
             userId: $userId
         );

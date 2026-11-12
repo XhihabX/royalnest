@@ -21,7 +21,9 @@ import {
     Store,
     Globe,
     LogOut,
-    UserCircle
+    UserCircle,
+    Sparkles,
+    Calculator
 } from 'lucide-vue-next';
 import { useI18n } from '../Composables/useI18n';
 
@@ -37,6 +39,8 @@ const { t, currentLocale, toggleLocale } = useI18n();
 const navItems = computed(() => [
     { label: t('dashboard', 'Overview'), href: '/', icon: LayoutDashboard },
     { label: t('daily_sales', 'Daily Sales'), href: '/sales', icon: ShoppingBag },
+    { label: t('daily_costs', 'Daily Costs'), href: '/daily-costs', icon: Sparkles },
+    { label: t('cash_reconciliation', 'Cash Reconciliation'), href: '/cash-reconciliation', icon: Calculator },
     { label: t('suppliers', 'Suppliers / Dealers'), href: '/suppliers/active', icon: Store },
     { label: t('purchases', 'Stock Receiving'), href: '/purchases', icon: Truck },
     { label: t('consumption', 'Kitchen Usage'), href: '/consumption', icon: Flame },

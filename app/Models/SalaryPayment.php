@@ -22,7 +22,7 @@ class SalaryPayment extends Model
     ];
 
     protected $casts = [
-        'payment_date' => 'date',
+        'payment_date' => 'date:Y-m-d',
         'amount' => 'decimal:2',
     ];
 
@@ -36,9 +36,13 @@ class SalaryPayment extends Model
         return $this->belongsTo(FinancialAccount::class, 'payment_account_id');
     }
 
+    public function account(): BelongsTo
+    {
+        return $this->paymentAccount();
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 }
-

@@ -63,7 +63,7 @@ class ProductController extends Controller
             'current_stock' => 0.0,
             'cost_price' => $validated['opening_cost_price'] ?? 0.0,
             'min_reorder_level' => $validated['min_reorder_level'] ?? 0.0,
-            'is_consumable' => !empty($validated['is_consumable']),
+            'is_consumable' => ! empty($validated['is_consumable']),
             'default_allocation_days' => $validated['default_allocation_days'] ?? null,
             'is_active' => true,
         ]);
@@ -76,8 +76,8 @@ class ProductController extends Controller
         ]);
 
         // Record opening stock if provided
-        $openingStock = (float)($validated['opening_stock'] ?? 0);
-        $openingCost = (float)($validated['opening_cost_price'] ?? 0);
+        $openingStock = (float) ($validated['opening_stock'] ?? 0);
+        $openingCost = (float) ($validated['opening_cost_price'] ?? 0);
         if ($openingStock > 0) {
             $this->stockLedgerService->recordMovement(
                 product: $product,
@@ -94,4 +94,3 @@ class ProductController extends Controller
         return redirect()->back()->with('success', "Product '{$product->name}' created successfully.");
     }
 }
-

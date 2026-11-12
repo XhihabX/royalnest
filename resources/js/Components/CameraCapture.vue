@@ -133,17 +133,17 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-    <div class="bg-stone-900 border border-stone-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
       <!-- Header -->
-      <div class="px-5 py-4 border-b border-stone-800 flex items-center justify-between bg-stone-950/60">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
         <div class="flex items-center gap-2">
           <Camera class="w-5 h-5 text-amber-500" />
-          <h3 class="font-semibold text-stone-100 text-lg">{{ title }}</h3>
+          <h3 class="font-semibold text-slate-100 text-lg">{{ title }}</h3>
         </div>
         <button
           type="button"
           @click="emit('close')"
-          class="p-1 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors"
+          class="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
         >
           <X class="w-5 h-5" />
         </button>
@@ -166,7 +166,7 @@ onBeforeUnmount(() => {
           <img
             :src="capturedImage"
             alt="Preview"
-            class="max-w-full max-h-[55vh] object-contain rounded-lg border border-stone-800 shadow"
+            class="max-w-full max-h-[55vh] object-contain rounded-lg border border-slate-800 shadow"
           />
         </div>
 
@@ -199,14 +199,14 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Footer Actions -->
-      <div class="p-4 bg-stone-950 border-t border-stone-800 flex items-center justify-between gap-3">
+      <div class="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-3">
         <!-- Left: Upload fallback button -->
         <button
           type="button"
           @click="fileInputRef?.click()"
-          class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-stone-700 bg-stone-800/80 hover:bg-stone-800 text-stone-300 text-xs font-medium transition"
+          class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-medium transition"
         >
-          <Upload class="w-3.5 h-3.5 text-stone-400" />
+          <Upload class="w-3.5 h-3.5 text-slate-400" />
           {{ t('upload_file', 'Upload File') }}
         </button>
 
@@ -218,7 +218,7 @@ onBeforeUnmount(() => {
             type="button"
             @click="switchCamera"
             title="Switch Camera"
-            class="p-2.5 rounded-full border border-stone-700 bg-stone-800 text-stone-300 hover:text-white transition"
+            class="p-2.5 rounded-full border border-slate-700 bg-slate-800 text-slate-300 hover:text-white transition"
           >
             <RefreshCw class="w-4 h-4" />
           </button>
@@ -239,7 +239,7 @@ onBeforeUnmount(() => {
             v-if="capturedImage"
             type="button"
             @click="retake"
-            class="px-4 py-2 rounded-xl border border-stone-700 bg-stone-800 text-stone-300 hover:text-white text-xs font-medium transition"
+            class="px-4 py-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 hover:text-white text-xs font-medium transition"
           >
             {{ t('retake', 'Retake') }}
           </button>
@@ -260,7 +260,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           @click="emit('close')"
-          class="text-xs text-stone-400 hover:text-stone-200 transition"
+          class="text-xs text-slate-400 hover:text-slate-200 transition"
         >
           {{ t('cancel', 'Cancel') }}
         </button>

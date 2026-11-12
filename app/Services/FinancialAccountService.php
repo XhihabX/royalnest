@@ -31,7 +31,7 @@ class FinancialAccountService
             $notes
         ) {
             $account = FinancialAccount::lockForUpdate()->findOrFail($accountId);
-            $account->current_balance = round((float)$account->current_balance + $amount, 2);
+            $account->current_balance = round((float) $account->current_balance + $amount, 2);
             $account->save();
 
             return AccountTransaction::create([
@@ -69,7 +69,7 @@ class FinancialAccountService
             $notes
         ) {
             $account = FinancialAccount::lockForUpdate()->findOrFail($accountId);
-            $account->current_balance = round((float)$account->current_balance - $amount, 2);
+            $account->current_balance = round((float) $account->current_balance - $amount, 2);
             $account->save();
 
             return AccountTransaction::create([
@@ -99,13 +99,13 @@ class FinancialAccountService
     ): array {
         if ($fromAccountId === $toAccountId) {
             throw ValidationException::withMessages([
-                'to_account_id' => 'Origin and destination accounts must be different.'
+                'to_account_id' => 'Origin and destination accounts must be different.',
             ]);
         }
 
         if ($amount <= 0) {
             throw ValidationException::withMessages([
-                'amount' => 'Transfer amount must be greater than zero.'
+                'amount' => 'Transfer amount must be greater than zero.',
             ]);
         }
 
@@ -113,10 +113,10 @@ class FinancialAccountService
             $from = FinancialAccount::lockForUpdate()->findOrFail($fromAccountId);
             $to = FinancialAccount::lockForUpdate()->findOrFail($toAccountId);
 
-            $from->current_balance = round((float)$from->current_balance - $amount, 2);
+            $from->current_balance = round((float) $from->current_balance - $amount, 2);
             $from->save();
 
-            $to->current_balance = round((float)$to->current_balance + $amount, 2);
+            $to->current_balance = round((float) $to->current_balance + $amount, 2);
             $to->save();
 
             $uId = $userId ?? (auth()->id() ?: 1);
@@ -145,4 +145,3 @@ class FinancialAccountService
         });
     }
 }
-

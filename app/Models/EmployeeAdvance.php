@@ -25,7 +25,7 @@ class EmployeeAdvance extends Model
     ];
 
     protected $casts = [
-        'advance_date' => 'date',
+        'advance_date' => 'date:Y-m-d',
         'amount' => 'decimal:2',
         'remaining_balance' => 'decimal:2',
     ];
@@ -50,4 +50,3 @@ class EmployeeAdvance extends Model
         return $this->hasMany(SalaryDeduction::class);
     }
 }
-

@@ -26,17 +26,17 @@ class ConsumptionService
             // 1. Pre-validation and stock checking
             foreach ($items as $item) {
                 $product = Product::lockForUpdate()->findOrFail($item['product_id']);
-                $quantityUsed = (float)$item['quantity_used'];
+                $quantityUsed = (float) $item['quantity_used'];
 
                 if ($quantityUsed <= 0) {
                     throw ValidationException::withMessages([
-                        'items' => "Quantity used for '{$product->name}' must be greater than zero."
+                        'items' => "Quantity used for '{$product->name}' must be greater than zero.",
                     ]);
                 }
 
-                if ((float)$product->current_stock < $quantityUsed) {
+                if ((float) $product->current_stock < $quantityUsed) {
                     throw ValidationException::withMessages([
-                        'items' => "Insufficient stock for '{$product->name}'. Available: {$product->current_stock} {$product->base_unit}, requested: {$quantityUsed} {$product->base_unit}."
+                        'items' => "Insufficient stock for '{$product->name}'. Available: {$product->current_stock} {$product->base_unit}, requested: {$quantityUsed} {$product->base_unit}.",
                     ]);
                 }
             }
@@ -54,7 +54,7 @@ class ConsumptionService
             // 3. FIFO Batch Consumption Traversal
             foreach ($items as $item) {
                 $product = Product::lockForUpdate()->findOrFail($item['product_id']);
-                $needed = (float)$item['quantity_used'];
+                $needed = (float) $item['quantity_used'];
 
                 // Fetch active batches ordered chronologically (FIFO: oldest received first)
                 $batches = StockBatch::where('product_id', $product->id)
@@ -66,13 +66,13 @@ class ConsumptionService
                     ->get();
 
                 // If no batch exists (e.g. fallback), create an initial batch for on-hand stock
-                if ($batches->isEmpty() && (float)$product->current_stock > 0) {
+                if ($batches->isEmpty() && (float) $product->current_stock > 0) {
                     $fallbackBatch = $this->stockLedgerService->createBatch(
                         product: $product,
-                        quantity: (float)$product->current_stock,
-                        unitCost: (float)$product->cost_price,
+                        quantity: (float) $product->current_stock,
+                        unitCost: (float) $product->cost_price,
                         receivedDate: $date,
-                        batchNo: 'OPENING-AUTO-' . $product->id
+                        batchNo: 'OPENING-AUTO-'.$product->id
                     );
                     $batches = collect([$fallbackBatch]);
                 }
@@ -82,9 +82,9 @@ class ConsumptionService
                         break;
                     }
 
-                    $rem = (float)$batch->remaining_quantity;
+                    $rem = (float) $batch->remaining_quantity;
                     $take = min($rem, $needed);
-                    $sliceUnitCost = (float)$batch->unit_cost;
+                    $sliceUnitCost = (float) $batch->unit_cost;
                     $sliceTotalCost = round($take * $sliceUnitCost, 2);
 
                     // Deduct from batch
@@ -128,7 +128,7 @@ class ConsumptionService
 
                 // If still needed (in case batches were fewer than current_stock), deduct remainder at product cost
                 if ($needed > 0) {
-                    $unitCost = (float)$product->cost_price;
+                    $unitCost = (float) $product->cost_price;
                     $sliceTotalCost = round($needed * $unitCost, 2);
 
                     $this->stockLedgerService->recordMovement(
@@ -141,7 +141,7 @@ class ConsumptionService
                         referenceType: Consumption::class,
                         referenceId: $consumption->id,
                         userId: $userId,
-                        notes: "FIFO usage remaining balance",
+                        notes: 'FIFO usage remaining balance',
                         allowNegative: false
                     );
 

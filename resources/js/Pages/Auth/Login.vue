@@ -6,8 +6,8 @@ import { useI18n } from '../../Composables/useI18n';
 const { t, currentLocale, toggleLocale } = useI18n();
 
 const form = useForm({
-    email: 'admin@royalnest.com',
-    password: 'password',
+    email: '',
+    password: '',
     remember: true,
 });
 

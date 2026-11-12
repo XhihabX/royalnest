@@ -21,7 +21,7 @@ class OperatingExpense extends Model
     ];
 
     protected $casts = [
-        'expense_date' => 'date',
+        'expense_date' => 'date:Y-m-d',
         'amount' => 'decimal:2',
     ];
 
@@ -35,4 +35,3 @@ class OperatingExpense extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 }
-

@@ -24,7 +24,7 @@ class Purchase extends Model
     ];
 
     protected $casts = [
-        'purchase_date' => 'date',
+        'purchase_date' => 'date:Y-m-d',
         'total_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'is_purchase_and_consume' => 'boolean',
@@ -50,4 +50,3 @@ class Purchase extends Model
         return $this->hasMany(ConsumableAllocation::class);
     }
 }
-

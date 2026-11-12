@@ -26,17 +26,17 @@ class ProfitLossService
         $daysInMonth = $carbonDate->daysInMonth;
 
         // 1. Sales
-        $sale = DailySale::where('sales_date', $date)->first();
-        $totalSales = $sale ? (float)$sale->total_sales : 0.00;
-        $cashSales = $sale ? (float)$sale->cash_sales : 0.00;
-        $bkashSales = $sale ? (float)$sale->bkash_sales : 0.00;
-        $nagadSales = $sale ? (float)$sale->nagad_sales : 0.00;
-        $cardBankSales = $sale ? (float)$sale->card_bank_sales : 0.00;
-        $otherSales = $sale ? (float)$sale->other_sales : 0.00;
-        $discrepancy = $sale ? (float)$sale->discrepancy_amount : 0.00;
+        $sale = DailySale::whereDate('sales_date', $date)->first();
+        $totalSales = $sale ? (float) $sale->total_sales : 0.00;
+        $cashSales = $sale ? (float) $sale->cash_sales : 0.00;
+        $bkashSales = $sale ? (float) $sale->bkash_sales : 0.00;
+        $nagadSales = $sale ? (float) $sale->nagad_sales : 0.00;
+        $cardBankSales = $sale ? (float) $sale->card_bank_sales : 0.00;
+        $otherSales = $sale ? (float) $sale->other_sales : 0.00;
+        $discrepancy = $sale ? (float) $sale->discrepancy_amount : 0.00;
 
         // 2. Ingredient Consumption Cost (Direct usage)
-        $consumptionCost = (float) Consumption::where('consumption_date', $date)->sum('total_cost');
+        $consumptionCost = (float) Consumption::whereDate('consumption_date', $date)->sum('total_cost');
 
         // 3. Consumable Allocated Cost (Multi-day amortized)
         $consumableCost = $this->consumableAllocationService->getAllocatedCostForDate($date);
@@ -48,27 +48,32 @@ class ProfitLossService
         $grossProfit = round($totalSales - $costOfMaterials, 2);
 
         // 4. Operating Expenses
-        $operatingExpenses = (float) OperatingExpense::where('expense_date', $date)->sum('amount');
+        $operatingExpenses = (float) OperatingExpense::whereDate('expense_date', $date)->sum('amount');
 
         // 5. Wastage Cost
-        $wastageCost = (float) Wastage::where('wastage_date', $date)->sum('total_cost');
+        $wastageCost = (float) Wastage::whereDate('wastage_date', $date)->sum('total_cost');
 
         // 6. Accrued Staff Salary Cost
         // Active monthly employees: agreed_salary / days_in_month; daily employees: daily agreed_salary
         $activeEmployees = Employee::where('is_active', true)->get();
         $salaryCost = 0.00;
         foreach ($activeEmployees as $emp) {
+            // Do not accrue salary prior to employee joining date
+            if ($emp->joining_date && $carbonDate->lt(Carbon::parse($emp->joining_date)->startOfDay())) {
+                continue;
+            }
+
             if ($emp->salary_type === 'monthly') {
-                $salaryCost += ((float)$emp->agreed_salary / $daysInMonth);
+                $salaryCost += ((float) $emp->agreed_salary / $daysInMonth);
             } else {
                 // Daily: check if present or marked attendance
                 $attended = EmployeeAttendance::where('employee_id', $emp->id)
-                    ->where('attendance_date', $date)
+                    ->whereDate('attendance_date', $date)
                     ->whereIn('status', ['present', 'half_day'])
                     ->first();
                 if ($attended) {
                     $multiplier = $attended->status === 'half_day' ? 0.5 : 1.0;
-                    $salaryCost += ((float)$emp->agreed_salary * $multiplier);
+                    $salaryCost += ((float) $emp->agreed_salary * $multiplier);
                 }
             }
         }
@@ -115,7 +120,7 @@ class ProfitLossService
     public function getRangeSummary(string $startDate, string $endDate): array
     {
         $period = CarbonPeriod::create($startDate, $endDate);
-        
+
         $totalSales = (float) DailySale::whereBetween('sales_date', [$startDate, $endDate])->sum('total_sales');
         $consumptionCost = (float) Consumption::whereBetween('consumption_date', [$startDate, $endDate])->sum('total_cost');
         $consumableCost = $this->consumableAllocationService->getAllocatedCostForRange($startDate, $endDate);
@@ -124,20 +129,25 @@ class ProfitLossService
 
         // Sum daily salary accruals across the range
         $totalSalaryCost = 0.00;
+        $activeEmployees = Employee::where('is_active', true)->get();
         foreach ($period as $date) {
             $daysInMonth = $date->daysInMonth;
-            $activeEmployees = Employee::where('is_active', true)->get();
+            $dateStr = $date->toDateString();
             foreach ($activeEmployees as $emp) {
+                if ($emp->joining_date && $date->lt(Carbon::parse($emp->joining_date)->startOfDay())) {
+                    continue;
+                }
+
                 if ($emp->salary_type === 'monthly') {
-                    $totalSalaryCost += ((float)$emp->agreed_salary / $daysInMonth);
+                    $totalSalaryCost += ((float) $emp->agreed_salary / $daysInMonth);
                 } else {
                     $attended = EmployeeAttendance::where('employee_id', $emp->id)
-                        ->where('attendance_date', $date->toDateString())
+                        ->whereDate('attendance_date', $dateStr)
                         ->whereIn('status', ['present', 'half_day'])
                         ->first();
                     if ($attended) {
                         $multiplier = $attended->status === 'half_day' ? 0.5 : 1.0;
-                        $totalSalaryCost += ((float)$emp->agreed_salary * $multiplier);
+                        $totalSalaryCost += ((float) $emp->agreed_salary * $multiplier);
                     }
                 }
             }
@@ -167,4 +177,3 @@ class ProfitLossService
         ];
     }
 }
-

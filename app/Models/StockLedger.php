@@ -11,6 +11,7 @@ class StockLedger extends Model
     use HasFactory;
 
     protected $table = 'stock_ledger';
+
     public $timestamps = false; // migration has created_at timestamp default current
 
     protected $fillable = [
@@ -31,7 +32,7 @@ class StockLedger extends Model
     ];
 
     protected $casts = [
-        'transaction_date' => 'date',
+        'transaction_date' => 'date:Y-m-d',
         'quantity_in' => 'decimal:4',
         'quantity_out' => 'decimal:4',
         'balance_after' => 'decimal:4',
@@ -55,4 +56,3 @@ class StockLedger extends Model
         return $this->belongsTo(User::class);
     }
 }
-

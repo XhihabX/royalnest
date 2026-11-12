@@ -22,7 +22,7 @@ class SalaryDeduction extends Model
     ];
 
     protected $casts = [
-        'deduction_date' => 'date',
+        'deduction_date' => 'date:Y-m-d',
         'amount' => 'decimal:2',
     ];
 
@@ -46,4 +46,3 @@ class SalaryDeduction extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 }
-

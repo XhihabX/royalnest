@@ -19,7 +19,7 @@ class Consumption extends Model
     ];
 
     protected $casts = [
-        'consumption_date' => 'date',
+        'consumption_date' => 'date:Y-m-d',
         'total_cost' => 'decimal:2',
     ];
 
@@ -33,4 +33,3 @@ class Consumption extends Model
         return $this->hasMany(ConsumptionItem::class);
     }
 }
-

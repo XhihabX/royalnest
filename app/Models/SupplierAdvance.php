@@ -23,7 +23,7 @@ class SupplierAdvance extends Model
     ];
 
     protected $casts = [
-        'advance_date' => 'date',
+        'advance_date' => 'date:Y-m-d',
         'amount' => 'decimal:2',
         'remaining_balance' => 'decimal:2',
     ];
@@ -43,4 +43,3 @@ class SupplierAdvance extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 }
-

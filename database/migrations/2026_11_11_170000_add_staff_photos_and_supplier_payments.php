@@ -29,7 +29,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        if (!Schema::hasColumn('purchases', 'payment_account_id')) {
+        if (! Schema::hasColumn('purchases', 'payment_account_id')) {
             Schema::table('purchases', function (Blueprint $table) {
                 $table->foreignId('payment_account_id')->nullable()->after('paid_amount')->constrained('financial_accounts')->nullOnDelete();
             });
@@ -52,4 +52,3 @@ return new class extends Migration
         });
     }
 };
-

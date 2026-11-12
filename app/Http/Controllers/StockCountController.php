@@ -55,13 +55,13 @@ class StockCountController extends Controller
 
             foreach ($validated['items'] as $itemData) {
                 $product = Product::lockForUpdate()->findOrFail($itemData['product_id']);
-                $sysQty = (float)$product->current_stock;
-                $countedQty = (float)$itemData['counted_quantity'];
+                $sysQty = (float) $product->current_stock;
+                $countedQty = (float) $itemData['counted_quantity'];
                 $diffQty = round($countedQty - $sysQty, 4);
-                $unitCost = (float)$product->cost_price;
+                $unitCost = (float) $product->cost_price;
                 $diffValue = round($diffQty * $unitCost, 2);
 
-                StockCountItem::create([
+                $countItem = StockCountItem::create([
                     'stock_count_id' => $count->id,
                     'product_id' => $product->id,
                     'system_quantity' => $sysQty,
@@ -74,7 +74,7 @@ class StockCountController extends Controller
 
                 // Surplus: create dedicated StockBatch and ledger movement
                 if ($diffQty > 0) {
-                    $batchNo = 'COUNT-ADJ-' . date('Ymd', strtotime($validated['count_date'])) . '-' . $product->id . '-' . strtoupper(substr(uniqid(), -4));
+                    $batchNo = 'COUNT-ADJ-'.date('Ymd', strtotime($validated['count_date'])).'-'.$product->id.'-'.strtoupper(substr(uniqid(), -4));
                     $batch = $this->stockLedgerService->createBatch(
                         product: $product,
                         quantity: $diffQty,
@@ -92,13 +92,14 @@ class StockCountController extends Controller
                         transactionDate: $validated['count_date'],
                         referenceType: StockCount::class,
                         referenceId: $count->id,
-                        notes: "Stock count surplus ({$batchNo}): " . ($itemData['adjustment_reason'] ?? 'Count audit surplus'),
+                        notes: "Stock count surplus ({$batchNo}): ".($itemData['adjustment_reason'] ?? 'Count audit surplus'),
                         allowNegative: false,
                         stockBatchId: $batch->id
                     );
                 } elseif ($diffQty < 0) {
                     // Deficit: deplete active FIFO batches chronologically
                     $needed = abs($diffQty);
+                    $totalDepletedValue = 0.0;
 
                     $batches = StockBatch::where('product_id', $product->id)
                         ->where('is_exhausted', false)
@@ -109,11 +110,14 @@ class StockCountController extends Controller
                         ->get();
 
                     foreach ($batches as $batch) {
-                        if ($needed <= 0) break;
+                        if ($needed <= 0) {
+                            break;
+                        }
 
-                        $rem = (float)$batch->remaining_quantity;
+                        $rem = (float) $batch->remaining_quantity;
                         $take = min($rem, $needed);
-                        $sliceUnitCost = (float)$batch->unit_cost;
+                        $sliceUnitCost = (float) $batch->unit_cost;
+                        $totalDepletedValue += ($take * $sliceUnitCost);
 
                         $batch->remaining_quantity = round($rem - $take, 4);
                         if ($batch->remaining_quantity <= 0) {
@@ -131,7 +135,7 @@ class StockCountController extends Controller
                             transactionDate: $validated['count_date'],
                             referenceType: StockCount::class,
                             referenceId: $count->id,
-                            notes: "Stock count deficit from Batch {$batch->batch_no}: " . ($itemData['adjustment_reason'] ?? 'Count audit deficit'),
+                            notes: "Stock count deficit from Batch {$batch->batch_no}: ".($itemData['adjustment_reason'] ?? 'Count audit deficit'),
                             allowNegative: false,
                             stockBatchId: $batch->id
                         );
@@ -140,6 +144,7 @@ class StockCountController extends Controller
                     }
 
                     if ($needed > 0) {
+                        $totalDepletedValue += ($needed * $unitCost);
                         $this->stockLedgerService->recordMovement(
                             product: $product,
                             movementType: 'adjustment_out',
@@ -149,9 +154,16 @@ class StockCountController extends Controller
                             transactionDate: $validated['count_date'],
                             referenceType: StockCount::class,
                             referenceId: $count->id,
-                            notes: "Stock count deficit unbatched remainder: " . ($itemData['adjustment_reason'] ?? 'Count audit deficit'),
+                            notes: 'Stock count deficit unbatched remainder: '.($itemData['adjustment_reason'] ?? 'Count audit deficit'),
                             allowNegative: false
                         );
+                    }
+
+                    if ($totalDepletedValue > 0) {
+                        $countItem->update([
+                            'difference_value' => -round($totalDepletedValue, 2),
+                            'unit_cost' => round($totalDepletedValue / abs($diffQty), 4),
+                        ]);
                     }
                 }
             }
@@ -160,4 +172,3 @@ class StockCountController extends Controller
         return redirect()->back()->with('success', 'Physical stock count confirmed and FIFO batches synchronized with ledger.');
     }
 }
-

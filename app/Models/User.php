@@ -56,18 +56,24 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class, 'user_roles');
     }
 
-    public function hasRole(string $roleName): bool
+    public function hasRole(string|array $roles): bool
     {
-        if ($this->primary_role === $roleName) {
+        $roleList = is_array($roles) ? $roles : explode('|', $roles);
+
+        if (in_array($this->primary_role, ['owner', 'admin'])) {
             return true;
         }
 
-        return $this->roles->contains('name', $roleName);
+        if (in_array($this->primary_role, $roleList)) {
+            return true;
+        }
+
+        return $this->roles->contains(fn ($r) => in_array($r->name, $roleList));
     }
 
     public function hasPermission(string $permissionName): bool
     {
-        if ($this->hasRole('owner')) {
+        if (in_array($this->primary_role, ['owner', 'admin'])) {
             return true;
         }
 

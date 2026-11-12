@@ -35,7 +35,7 @@ class Employee extends Model
     ];
 
     protected $casts = [
-        'joining_date' => 'date',
+        'joining_date' => 'date:Y-m-d',
         'agreed_salary' => 'decimal:2',
         'hourly_rate' => 'decimal:2',
         'is_active' => 'boolean',

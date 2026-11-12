@@ -42,9 +42,9 @@ class FinancialAccountController extends Controller
         ]);
 
         $this->accountService->transfer(
-            fromAccountId: (int)$validated['from_account_id'],
-            toAccountId: (int)$validated['to_account_id'],
-            amount: (float)$validated['amount'],
+            fromAccountId: (int) $validated['from_account_id'],
+            toAccountId: (int) $validated['to_account_id'],
+            amount: (float) $validated['amount'],
             date: $validated['transaction_date'],
             notes: $validated['notes'] ?? null
         );
@@ -64,15 +64,15 @@ class FinancialAccountController extends Controller
 
         if ($validated['type'] === 'deposit') {
             $this->accountService->deposit(
-                accountId: (int)$validated['financial_account_id'],
-                amount: (float)$validated['amount'],
+                accountId: (int) $validated['financial_account_id'],
+                amount: (float) $validated['amount'],
                 date: $validated['transaction_date'],
                 notes: $validated['notes'] ?? 'Manual deposit adjustment'
             );
         } else {
             $this->accountService->withdraw(
-                accountId: (int)$validated['financial_account_id'],
-                amount: (float)$validated['amount'],
+                accountId: (int) $validated['financial_account_id'],
+                amount: (float) $validated['amount'],
                 date: $validated['transaction_date'],
                 notes: $validated['notes'] ?? 'Manual withdrawal adjustment'
             );
@@ -81,4 +81,3 @@ class FinancialAccountController extends Controller
         return redirect()->back()->with('success', 'Account balance adjusted.');
     }
 }
-

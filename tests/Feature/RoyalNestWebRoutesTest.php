@@ -17,7 +17,7 @@ class RoyalNestWebRoutesTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->create([
-            'email' => 'web_admin_' . uniqid() . '@royalnest.com',
+            'email' => 'web_admin_'.uniqid().'@royalnest.com',
             'primary_role' => 'owner',
         ]);
     }

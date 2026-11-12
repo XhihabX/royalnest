@@ -45,4 +45,3 @@ class PurchaseItem extends Model
         return $this->hasMany(StockBatch::class);
     }
 }
-

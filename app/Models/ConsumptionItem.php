@@ -41,4 +41,3 @@ class ConsumptionItem extends Model
         return $this->belongsTo(StockBatch::class);
     }
 }
-

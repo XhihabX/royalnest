@@ -11,6 +11,9 @@ import {
     Info, 
     Printer 
 } from 'lucide-vue-next';
+import { useI18n } from '@/Composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
     mode: String,
@@ -48,9 +51,9 @@ const printReport = () => {
     <AppLayout title="Profit & Loss Statement">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 print:hidden">
             <div>
-                <h1 class="text-2xl font-bold text-white tracking-tight">True Profit & Loss Statement</h1>
+                <h1 class="text-2xl font-bold text-white tracking-tight">{{ t('profit_loss_report', 'True Profit & Loss Statement') }}</h1>
                 <p class="text-xs text-slate-400 mt-1">
-                    Accurate restaurant financial performance isolating material usage, amortized consumables, and operating costs.
+                    {{ t('pnl_desc', 'Accurate restaurant financial performance isolating material usage, amortized consumables, and operating costs.') }}
                 </p>
             </div>
 

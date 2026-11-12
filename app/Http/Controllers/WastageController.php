@@ -46,12 +46,12 @@ class WastageController extends Controller
 
         DB::transaction(function () use ($validated) {
             $product = Product::lockForUpdate()->findOrFail($validated['product_id']);
-            $quantity = (float)$validated['quantity'];
+            $quantity = (float) $validated['quantity'];
 
             // 1. Negative stock prevention
-            if ((float)$product->current_stock < $quantity) {
+            if ((float) $product->current_stock < $quantity) {
                 throw ValidationException::withMessages([
-                    'quantity' => "Insufficient stock for '{$product->name}'. Available: {$product->current_stock} {$product->base_unit}, requested: {$quantity} {$product->base_unit}."
+                    'quantity' => "Insufficient stock for '{$product->name}'. Available: {$product->current_stock} {$product->base_unit}, requested: {$quantity} {$product->base_unit}.",
                 ]);
             }
 
@@ -65,13 +65,13 @@ class WastageController extends Controller
                 ->get();
 
             // Fallback batch if needed
-            if ($batches->isEmpty() && (float)$product->current_stock > 0) {
+            if ($batches->isEmpty() && (float) $product->current_stock > 0) {
                 $fallbackBatch = $this->stockLedgerService->createBatch(
                     product: $product,
-                    quantity: (float)$product->current_stock,
-                    unitCost: (float)$product->cost_price,
+                    quantity: (float) $product->current_stock,
+                    unitCost: (float) $product->cost_price,
                     receivedDate: $validated['wastage_date'],
-                    batchNo: 'OPENING-AUTO-' . $product->id
+                    batchNo: 'OPENING-AUTO-'.$product->id
                 );
                 $batches = collect([$fallbackBatch]);
             }
@@ -93,11 +93,13 @@ class WastageController extends Controller
 
             // 4. FIFO batch deduction traversal
             foreach ($batches as $batch) {
-                if ($needed <= 0) break;
+                if ($needed <= 0) {
+                    break;
+                }
 
-                $rem = (float)$batch->remaining_quantity;
+                $rem = (float) $batch->remaining_quantity;
                 $take = min($rem, $needed);
-                $sliceUnitCost = (float)$batch->unit_cost;
+                $sliceUnitCost = (float) $batch->unit_cost;
                 $sliceCost = round($take * $sliceUnitCost, 2);
 
                 $batch->remaining_quantity = round($rem - $take, 4);
@@ -128,7 +130,7 @@ class WastageController extends Controller
 
             // Remainder unbatched balance if any
             if ($needed > 0) {
-                $unitCost = (float)$product->cost_price;
+                $unitCost = (float) $product->cost_price;
                 $sliceCost = round($needed * $unitCost, 2);
 
                 $this->stockLedgerService->recordMovement(
@@ -157,4 +159,3 @@ class WastageController extends Controller
         return redirect()->back()->with('success', 'Wastage recorded with accurate FIFO batch costing and deducted from stock ledger.');
     }
 }
-

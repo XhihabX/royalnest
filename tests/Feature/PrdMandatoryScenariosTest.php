@@ -3,18 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Category;
-use App\Models\ConsumableAllocation;
 use App\Models\DailySale;
 use App\Models\Employee;
 use App\Models\FinancialAccount;
-use App\Models\OperatingExpense;
 use App\Models\Product;
 use App\Models\ProductUnitConversion;
 use App\Models\Purchase;
 use App\Models\StockCount;
 use App\Models\StockCountItem;
-use App\Models\StockLedger;
-use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Wastage;
 use App\Services\ConsumableAllocationService;
@@ -32,11 +28,17 @@ class PrdMandatoryScenariosTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected StockLedgerService $stockService;
+
     protected PurchaseService $purchaseService;
+
     protected ConsumptionService $consumptionService;
+
     protected ConsumableAllocationService $consumableService;
+
     protected FinancialAccountService $accountService;
+
     protected ProfitLossService $profitLossService;
 
     protected function setUp(): void
@@ -44,7 +46,7 @@ class PrdMandatoryScenariosTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->create([
-            'email' => 'admin_test_' . uniqid() . '@royalnest.com',
+            'email' => 'admin_test_'.uniqid().'@royalnest.com',
             'primary_role' => 'owner',
         ]);
 
@@ -118,22 +120,22 @@ class PrdMandatoryScenariosTest extends TestCase
                 'purchase_quantity' => 100.0,
                 'purchase_unit' => 'g',
                 'unit_price' => 2.50,
-            ]
+            ],
         ], $this->user->id);
 
         $cardamom->refresh();
-        $this->assertEquals(100.0, (float)$cardamom->current_stock);
+        $this->assertEquals(100.0, (float) $cardamom->current_stock);
 
         // Consume 100g
         $this->consumptionService->recordConsumption('2026-11-12', [
             [
                 'product_id' => $cardamom->id,
                 'quantity_used' => 100.0,
-            ]
+            ],
         ], $this->user->id);
 
         $cardamom->refresh();
-        $this->assertEquals(0.0, (float)$cardamom->current_stock);
+        $this->assertEquals(0.0, (float) $cardamom->current_stock);
         $this->assertEquals(2, $cardamom->stockLedgers()->count());
     }
 
@@ -153,22 +155,22 @@ class PrdMandatoryScenariosTest extends TestCase
                 'purchase_quantity' => 1.0, // 1 kg
                 'purchase_unit' => 'kg',
                 'unit_price' => 120.00, // ৳120 per kg = ৳0.12 per gram
-            ]
+            ],
         ], $this->user->id);
 
         $rice->refresh();
-        $this->assertEquals(1000.0, (float)$rice->current_stock);
+        $this->assertEquals(1000.0, (float) $rice->current_stock);
 
         // Consume 300 grams
         $this->consumptionService->recordConsumption('2026-11-12', [
             [
                 'product_id' => $rice->id,
                 'quantity_used' => 300.0,
-            ]
+            ],
         ], $this->user->id);
 
         $rice->refresh();
-        $this->assertEquals(700.0, (float)$rice->current_stock);
+        $this->assertEquals(700.0, (float) $rice->current_stock);
     }
 
     /**
@@ -181,7 +183,7 @@ class PrdMandatoryScenariosTest extends TestCase
     public function test_scenario_3_fifo_batch_cost_calculation(): void
     {
         $beef = $this->createProduct('Beef', 'kg', 'kg', 1.0, 10.0, 100.00);
-        $this->assertEquals(10.0, (float)$beef->current_stock);
+        $this->assertEquals(10.0, (float) $beef->current_stock);
 
         // Purchase another 10 kg @ ৳120 (Batch 2)
         $this->purchaseService->confirmPurchase([
@@ -192,49 +194,49 @@ class PrdMandatoryScenariosTest extends TestCase
                 'purchase_quantity' => 10.0,
                 'purchase_unit' => 'kg',
                 'unit_price' => 120.00,
-            ]
+            ],
         ], $this->user->id);
 
         $beef->refresh();
-        $this->assertEquals(20.0, (float)$beef->current_stock);
+        $this->assertEquals(20.0, (float) $beef->current_stock);
 
         // Verify two distinct batches exist
         $batches = $beef->activeBatches()->get();
         $this->assertCount(2, $batches);
-        $this->assertEquals(100.00, (float)$batches[0]->unit_cost);
-        $this->assertEquals(120.00, (float)$batches[1]->unit_cost);
+        $this->assertEquals(100.00, (float) $batches[0]->unit_cost);
+        $this->assertEquals(120.00, (float) $batches[1]->unit_cost);
 
         // 1. Consume 5 kg: FIFO must take from the older Batch 1 @ ৳100/kg
         $consumption1 = $this->consumptionService->recordConsumption('2026-11-12', [
             [
                 'product_id' => $beef->id,
                 'quantity_used' => 5.0,
-            ]
+            ],
         ], $this->user->id);
 
         $beef->refresh();
-        $this->assertEquals(15.0, (float)$beef->current_stock);
+        $this->assertEquals(15.0, (float) $beef->current_stock);
         // Cost is 5kg * ৳100 = ৳500 (NOT ৳550)
-        $this->assertEquals(500.00, (float)$consumption1->total_cost);
+        $this->assertEquals(500.00, (float) $consumption1->total_cost);
 
         // 2. Consume another 7 kg: takes remaining 5 kg of Batch 1 @ ৳100 + 2 kg of Batch 2 @ ৳120
         $consumption2 = $this->consumptionService->recordConsumption('2026-11-12', [
             [
                 'product_id' => $beef->id,
                 'quantity_used' => 7.0,
-            ]
+            ],
         ], $this->user->id);
 
         $beef->refresh();
-        $this->assertEquals(8.0, (float)$beef->current_stock);
+        $this->assertEquals(8.0, (float) $beef->current_stock);
         // Cost is (5 * 100) + (2 * 120) = 500 + 240 = ৳740
-        $this->assertEquals(740.00, (float)$consumption2->total_cost);
+        $this->assertEquals(740.00, (float) $consumption2->total_cost);
 
         // Batch 1 is exhausted; Batch 2 has 8 kg remaining
         $this->assertCount(1, $beef->activeBatches()->get());
         $remainingBatch = $beef->activeBatches()->first();
-        $this->assertEquals(8.0, (float)$remainingBatch->remaining_quantity);
-        $this->assertEquals(120.00, (float)$remainingBatch->unit_cost);
+        $this->assertEquals(8.0, (float) $remainingBatch->remaining_quantity);
+        $this->assertEquals(120.00, (float) $remainingBatch->unit_cost);
     }
 
     /**
@@ -252,7 +254,7 @@ class PrdMandatoryScenariosTest extends TestCase
             [
                 'product_id' => $chicken->id,
                 'quantity_used' => 10.0,
-            ]
+            ],
         ], $this->user->id);
     }
 
@@ -264,7 +266,7 @@ class PrdMandatoryScenariosTest extends TestCase
         $milk = $this->createProduct('Liquid Milk', 'L', 'L', 1.0, 10.0, 80.00);
 
         // Record 2L spoiled milk
-        $unitCost = (float)$milk->cost_price;
+        $unitCost = (float) $milk->cost_price;
         $qtyWasted = 2.0;
         $totalWastageCost = round($qtyWasted * $unitCost, 2);
 
@@ -293,11 +295,11 @@ class PrdMandatoryScenariosTest extends TestCase
         );
 
         $milk->refresh();
-        $this->assertEquals(8.0, (float)$milk->current_stock);
+        $this->assertEquals(8.0, (float) $milk->current_stock);
 
         // Verify P&L reflects wastage
         $pnl = $this->profitLossService->getDailySummary('2026-11-12');
-        $this->assertEquals(160.00, (float)$pnl['operating_costs']['wastage_cost']);
+        $this->assertEquals(160.00, (float) $pnl['operating_costs']['wastage_cost']);
     }
 
     /**
@@ -342,7 +344,7 @@ class PrdMandatoryScenariosTest extends TestCase
         );
 
         $sugar->refresh();
-        $this->assertEquals(18.0, (float)$sugar->current_stock);
+        $this->assertEquals(18.0, (float) $sugar->current_stock);
     }
 
     /**
@@ -364,7 +366,7 @@ class PrdMandatoryScenariosTest extends TestCase
             notes: 'Dining room tissue allocation'
         );
 
-        $this->assertEquals(30.00, (float)$allocation->daily_allocated_cost);
+        $this->assertEquals(30.00, (float) $allocation->daily_allocated_cost);
         $this->assertEquals('2026-11-13', $allocation->end_date->toDateString());
 
         // Check daily allocated cost for 2026-11-11
@@ -373,7 +375,7 @@ class PrdMandatoryScenariosTest extends TestCase
 
         // Check P&L on 2026-11-11
         $pnl = $this->profitLossService->getDailySummary('2026-11-11');
-        $this->assertEquals(30.00, (float)$pnl['cost_of_materials']['consumables_allocated']);
+        $this->assertEquals(30.00, (float) $pnl['cost_of_materials']['consumables_allocated']);
     }
 
     /**
@@ -402,7 +404,7 @@ class PrdMandatoryScenariosTest extends TestCase
 
         // Monthly salary is ৳15,000. In November (30 days), daily accrual is ৳15,000 / 30 = ৳500/day.
         $pnl = $this->profitLossService->getDailySummary('2026-11-12');
-        $this->assertEquals(500.00, (float)$pnl['operating_costs']['salary_cost']);
+        $this->assertEquals(500.00, (float) $pnl['operating_costs']['salary_cost']);
 
         // Cash payment of ৳10,000 advance/partial salary
         $this->accountService->withdraw(
@@ -416,16 +418,16 @@ class PrdMandatoryScenariosTest extends TestCase
         );
 
         $cashDrawer->refresh();
-        $this->assertEquals(10000.00, (float)$cashDrawer->current_balance);
+        $this->assertEquals(10000.00, (float) $cashDrawer->current_balance);
 
         // Outstanding payable is ৳5,000
         $totalPaid = 10000.00;
-        $remainingPayable = (float)$employee->agreed_salary - $totalPaid;
+        $remainingPayable = (float) $employee->agreed_salary - $totalPaid;
         $this->assertEquals(5000.00, $remainingPayable);
 
         // Daily P&L salary cost is STILL ৳500/day, NOT ৳10,500!
         $pnlAfterPayment = $this->profitLossService->getDailySummary('2026-11-12');
-        $this->assertEquals(500.00, (float)$pnlAfterPayment['operating_costs']['salary_cost']);
+        $this->assertEquals(500.00, (float) $pnlAfterPayment['operating_costs']['salary_cost']);
     }
 
     /**
@@ -467,8 +469,8 @@ class PrdMandatoryScenariosTest extends TestCase
 
         $cash->refresh();
         $bank->refresh();
-        $this->assertEquals(10000.00, (float)$cash->current_balance);
-        $this->assertEquals(55000.00, (float)$bank->current_balance);
+        $this->assertEquals(10000.00, (float) $cash->current_balance);
+        $this->assertEquals(55000.00, (float) $bank->current_balance);
 
         $pnlAfter = $this->profitLossService->getDailySummary('2026-11-12');
 
@@ -502,16 +504,16 @@ class PrdMandatoryScenariosTest extends TestCase
                 'purchase_quantity' => 10.0,
                 'purchase_unit' => 'L',
                 'unit_price' => 220.00,
-            ]
+            ],
         ], $this->user->id);
 
         $oil->refresh();
-        $this->assertEquals(10000.0, (float)$oil->current_stock); // 10,000 ml
+        $this->assertEquals(10000.0, (float) $oil->current_stock); // 10,000 ml
 
         $pnlAfter = $this->profitLossService->getDailySummary('2026-11-12');
 
         // Material cost in P&L must remain 0 since none was consumed!
-        $this->assertEquals(0.00, (float)$pnlAfter['cost_of_materials']['ingredient_consumption']);
+        $this->assertEquals(0.00, (float) $pnlAfter['cost_of_materials']['ingredient_consumption']);
         $this->assertEquals($pnlBefore['net_profit'], $pnlAfter['net_profit']);
     }
 
@@ -536,25 +538,25 @@ class PrdMandatoryScenariosTest extends TestCase
                 'purchase_quantity' => 100.0,
                 'purchase_unit' => 'g',
                 'unit_price' => 2.50,
-            ]
+            ],
         ], $this->user->id);
 
         $cardamom->refresh();
 
         // 1. Ending stock is 0
-        $this->assertEquals(0.0, (float)$cardamom->current_stock);
+        $this->assertEquals(0.0, (float) $cardamom->current_stock);
 
         // 2. Both movements recorded in stock ledger (+100 and -100)
         $ledgers = $cardamom->stockLedgers()->orderBy('id')->get();
         $this->assertCount(2, $ledgers);
         $this->assertEquals('purchase_receipt', $ledgers[0]->movement_type);
-        $this->assertEquals(100.0, (float)$ledgers[0]->quantity_in);
+        $this->assertEquals(100.0, (float) $ledgers[0]->quantity_in);
         $this->assertEquals('consumption', $ledgers[1]->movement_type);
-        $this->assertEquals(100.0, (float)$ledgers[1]->quantity_out);
+        $this->assertEquals(100.0, (float) $ledgers[1]->quantity_out);
 
         // 3. P&L recognizes consumption cost once (৳250)
         $pnl = $this->profitLossService->getDailySummary('2026-11-12');
-        $this->assertEquals(250.00, (float)$pnl['cost_of_materials']['ingredient_consumption']);
+        $this->assertEquals(250.00, (float) $pnl['cost_of_materials']['ingredient_consumption']);
     }
 
     /**
@@ -573,12 +575,11 @@ class PrdMandatoryScenariosTest extends TestCase
             'created_by' => $this->user->id,
         ]);
 
-        $this->assertEquals(10000.00, (float)$sale->total_sales);
-        $this->assertEquals(500.00, (float)$sale->discrepancy_amount);
+        $this->assertEquals(10000.00, (float) $sale->total_sales);
+        $this->assertEquals(500.00, (float) $sale->discrepancy_amount);
 
         $pnl = $this->profitLossService->getDailySummary('2026-11-12');
-        $this->assertEquals(10000.00, (float)$pnl['sales']['total_sales']);
-        $this->assertEquals(500.00, (float)$pnl['sales']['discrepancy']);
+        $this->assertEquals(10000.00, (float) $pnl['sales']['total_sales']);
+        $this->assertEquals(500.00, (float) $pnl['sales']['discrepancy']);
     }
 }
-

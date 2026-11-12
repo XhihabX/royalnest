@@ -3,6 +3,9 @@ import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Trash2, Plus, AlertCircle } from 'lucide-vue-next';
+import { useI18n } from '@/Composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
     wastages: Array,
@@ -45,9 +48,9 @@ const submit = () => {
     <AppLayout title="Wastage & Spoilage">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-white tracking-tight">Ingredient Wastage & Spoilage</h1>
+                <h1 class="text-2xl font-bold text-white tracking-tight">{{ t('wastage', 'Ingredient Wastage & Spoilage') }}</h1>
                 <p class="text-xs text-slate-400 mt-1">
-                    Trace burnt, expired, or spoiled materials. Automatically deducts from stock and charges wastage cost to operating P&L.
+                    {{ t('wastage_desc', 'Trace burnt, expired, or spoiled materials. Automatically deducts from stock and charges wastage cost to operating P&L.') }}
                 </p>
             </div>
 
@@ -56,7 +59,7 @@ const submit = () => {
                 class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer"
             >
                 <Plus class="w-4 h-4" />
-                <span>Record Wastage</span>
+                <span>{{ t('record_wastage', 'Record Wastage') }}</span>
             </button>
         </div>
 

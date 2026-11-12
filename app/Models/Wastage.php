@@ -22,7 +22,7 @@ class Wastage extends Model
     ];
 
     protected $casts = [
-        'wastage_date' => 'date',
+        'wastage_date' => 'date:Y-m-d',
         'quantity' => 'decimal:4',
         'unit_cost' => 'decimal:4',
         'total_cost' => 'decimal:2',
@@ -38,4 +38,3 @@ class Wastage extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 }
-

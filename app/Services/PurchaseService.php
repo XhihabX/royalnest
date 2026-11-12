@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Consumption;
 use App\Models\ConsumptionItem;
-use App\Models\FinancialAccount;
 use App\Models\Product;
 use App\Models\ProductUnitConversion;
 use App\Models\Purchase;
@@ -34,9 +33,9 @@ class PurchaseService
             // 1. Calculate items, convert to base unit
             foreach ($items as $itemData) {
                 $product = Product::findOrFail($itemData['product_id']);
-                $purchaseQty = (float)$itemData['purchase_quantity'];
+                $purchaseQty = (float) $itemData['purchase_quantity'];
                 $purchaseUnit = trim($itemData['purchase_unit']);
-                $unitPrice = (float)$itemData['unit_price'];
+                $unitPrice = (float) $itemData['unit_price'];
                 $subtotal = round($purchaseQty * $unitPrice, 2);
                 $totalAmount += $subtotal;
 
@@ -46,19 +45,19 @@ class PurchaseService
                     $conv = ProductUnitConversion::where('product_id', $product->id)
                         ->where('purchase_unit', $purchaseUnit)
                         ->first();
-                    
-                    if (!$conv) {
+
+                    if (! $conv) {
                         throw ValidationException::withMessages([
-                            'items' => "No unit conversion defined for product '{$product->name}' from '{$purchaseUnit}' to base unit '{$product->base_unit}'."
+                            'items' => "No unit conversion defined for product '{$product->name}' from '{$purchaseUnit}' to base unit '{$product->base_unit}'.",
                         ]);
                     }
-                    $multiplier = (float)$conv->multiplier_to_base;
+                    $multiplier = (float) $conv->multiplier_to_base;
                 }
 
                 $baseQuantity = round($purchaseQty * $multiplier, 4);
                 if ($baseQuantity <= 0) {
                     throw ValidationException::withMessages([
-                        'items' => "Base quantity for '{$product->name}' must be greater than zero."
+                        'items' => "Base quantity for '{$product->name}' must be greater than zero.",
                     ]);
                 }
 
@@ -76,12 +75,12 @@ class PurchaseService
             }
 
             // 2. Create Purchase record
-            $paidAmount = isset($purchaseData['paid_amount']) ? (float)$purchaseData['paid_amount'] : 0.00;
-            $isPurchaseAndConsume = !empty($purchaseData['is_purchase_and_consume']);
+            $paidAmount = isset($purchaseData['paid_amount']) ? (float) $purchaseData['paid_amount'] : 0.00;
+            $isPurchaseAndConsume = ! empty($purchaseData['is_purchase_and_consume']);
 
             $purchase = Purchase::create([
                 'supplier_id' => $purchaseData['supplier_id'] ?? null,
-                'invoice_no' => $purchaseData['invoice_no'] ?? ('PUR-' . strtoupper(uniqid())),
+                'invoice_no' => $purchaseData['invoice_no'] ?? ('PUR-'.strtoupper(uniqid())),
                 'purchase_date' => $purchaseData['purchase_date'] ?? now()->toDateString(),
                 'total_amount' => $totalAmount,
                 'paid_amount' => $paidAmount,
@@ -118,7 +117,7 @@ class PurchaseService
                 ]);
 
                 // Create independent FIFO StockBatch for this purchase line
-                $batchNo = 'BATCH-' . $purchase->purchase_date->format('Ymd') . '-' . $purchaseItem->id;
+                $batchNo = 'BATCH-'.$purchase->purchase_date->format('Ymd').'-'.$purchaseItem->id;
                 $batch = $this->stockLedgerService->createBatch(
                     product: $product,
                     quantity: $pItem['base_quantity'],
@@ -185,9 +184,9 @@ class PurchaseService
             }
 
             // 5. Deduct paid amount from financial account if provided
-            if ($paidAmount > 0 && !empty($purchaseData['payment_account_id'])) {
+            if ($paidAmount > 0 && ! empty($purchaseData['payment_account_id'])) {
                 $this->financialAccountService->withdraw(
-                    accountId: (int)$purchaseData['payment_account_id'],
+                    accountId: (int) $purchaseData['payment_account_id'],
                     amount: $paidAmount,
                     date: $purchase->purchase_date->toDateString(),
                     referenceType: Purchase::class,

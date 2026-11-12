@@ -3,6 +3,9 @@ import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Layers, Filter, Search, RotateCcw } from 'lucide-vue-next';
+import { useI18n } from '@/Composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
     ledgers: Object,
@@ -31,9 +34,9 @@ const resetFilters = () => {
     <AppLayout title="Perpetual Stock Ledger">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-white tracking-tight">Perpetual Stock Movement Ledger</h1>
+                <h1 class="text-2xl font-bold text-white tracking-tight">{{ t('ledger', 'Perpetual Stock Movement Ledger') }}</h1>
                 <p class="text-xs text-slate-400 mt-1">
-                    Immutable audit trail of every stock increase, deduction, wastage, and count adjustment.
+                    {{ t('ledger_desc', 'Immutable audit trail of every stock increase, deduction, wastage, and count adjustment.') }}
                 </p>
             </div>
         </div>

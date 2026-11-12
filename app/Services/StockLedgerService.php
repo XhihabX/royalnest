@@ -21,7 +21,7 @@ class StockLedgerService
         ?int $purchaseItemId = null,
         ?string $batchNo = null
     ): StockBatch {
-        $bNo = $batchNo ?: ('BATCH-' . date('Ymd', strtotime($receivedDate)) . '-' . strtoupper(substr(uniqid(), -5)));
+        $bNo = $batchNo ?: ('BATCH-'.date('Ymd', strtotime($receivedDate)).'-'.strtoupper(substr(uniqid(), -5)));
 
         return StockBatch::create([
             'product_id' => $product->id,
@@ -72,28 +72,28 @@ class StockLedgerService
             $prod = Product::lockForUpdate()->findOrFail($product->id);
 
             // 1. Negative stock check
-            if ($quantityOut > 0 && !$allowNegative) {
-                if ((float)$prod->current_stock < (float)$quantityOut) {
+            if ($quantityOut > 0 && ! $allowNegative) {
+                if ((float) $prod->current_stock < (float) $quantityOut) {
                     throw ValidationException::withMessages([
-                        'quantity' => "Insufficient stock for '{$prod->name}'. Available: {$prod->current_stock} {$prod->base_unit}, requested: {$quantityOut} {$prod->base_unit}."
+                        'quantity' => "Insufficient stock for '{$prod->name}'. Available: {$prod->current_stock} {$prod->base_unit}, requested: {$quantityOut} {$prod->base_unit}.",
                     ]);
                 }
             }
 
             // 2. Handle batch creation for opening stock if not passed
             $resolvedBatchId = $stockBatchId;
-            if ($quantityIn > 0 && $movementType === 'opening_stock' && !$resolvedBatchId) {
-                $batch = $this->createBatch($prod, $quantityIn, $unitCost, $transactionDate, null, 'OPENING-' . date('Ymd', strtotime($transactionDate)));
+            if ($quantityIn > 0 && $movementType === 'opening_stock' && ! $resolvedBatchId) {
+                $batch = $this->createBatch($prod, $quantityIn, $unitCost, $transactionDate, null, 'OPENING-'.date('Ymd', strtotime($transactionDate)));
                 $resolvedBatchId = $batch->id;
             }
 
-            // Reference cost: in FIFO, product cost_price stores the unit_cost of incoming or active oldest batch
-            if ($unitCost > 0) {
+            // Reference cost: update product latest cost price only on incoming inventory receipts/adjustments
+            if ($unitCost > 0 && in_array($movementType, ['purchase_receipt', 'opening_stock', 'adjustment_in'])) {
                 $prod->cost_price = round($unitCost, 4);
             }
 
             // 3. Calculate new stock balance
-            $newBalance = round((float)$prod->current_stock + (float)$quantityIn - (float)$quantityOut, 4);
+            $newBalance = round((float) $prod->current_stock + (float) $quantityIn - (float) $quantityOut, 4);
             $prod->current_stock = $newBalance;
             $prod->save();
 

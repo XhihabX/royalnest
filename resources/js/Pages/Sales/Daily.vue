@@ -3,6 +3,9 @@ import { ref, computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { ShoppingBag, AlertTriangle, CheckCircle2, Calendar } from 'lucide-vue-next';
+import { useI18n } from '@/Composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
     sales: Array,
@@ -49,15 +52,15 @@ const submit = () => {
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
                 <div class="flex items-center space-x-2 mb-4">
                     <ShoppingBag class="w-5 h-5 text-amber-400" />
-                    <h2 class="text-base font-bold text-white">Record Daily Sales</h2>
+                    <h2 class="text-base font-bold text-white">{{ t('record_daily_sales', 'Record Daily Sales') }}</h2>
                 </div>
                 <p class="text-xs text-slate-400 mb-5">
-                    Manual end-of-day sales entry with automated payment method reconciliation (Cash, bKash, Nagad, Card).
+                    {{ t('daily_sales_desc', 'Manual end-of-day sales entry with automated payment method reconciliation (Cash, bKash, Nagad, Card).') }}
                 </p>
 
                 <form @submit.prevent="submit" class="space-y-4 text-xs">
                     <div>
-                        <label class="block text-slate-300 font-medium mb-1">Sales Date</label>
+                        <label class="block text-slate-300 font-medium mb-1">{{ t('date', 'Sales Date') }}</label>
                         <input 
                             type="date" 
                             v-model="form.sales_date" 
@@ -67,7 +70,7 @@ const submit = () => {
                     </div>
 
                     <div>
-                        <label class="block text-slate-300 font-medium mb-1">Total Gross Sales (৳)</label>
+                        <label class="block text-slate-300 font-medium mb-1">{{ t('total_sales', 'Total Gross Sales (৳)') }}</label>
                         <input 
                             type="number" 
                             step="0.01" 
@@ -80,12 +83,12 @@ const submit = () => {
 
                     <div class="pt-2 border-t border-slate-800/80">
                         <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                            Payment Breakdown
+                            {{ t('payment_breakdown', 'Payment Breakdown') }}
                         </span>
 
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-slate-400 mb-1">Cash (৳)</label>
+                                <label class="block text-slate-400 mb-1">{{ t('cash_sales', 'Cash (৳)') }}</label>
                                 <input 
                                     type="number" 
                                     step="0.01" 
@@ -96,7 +99,7 @@ const submit = () => {
                             </div>
 
                             <div>
-                                <label class="block text-slate-400 mb-1">bKash (৳)</label>
+                                <label class="block text-slate-400 mb-1">{{ t('bkash_sales', 'bKash (৳)') }}</label>
                                 <input 
                                     type="number" 
                                     step="0.01" 
@@ -107,7 +110,7 @@ const submit = () => {
                             </div>
 
                             <div>
-                                <label class="block text-slate-400 mb-1">Nagad (৳)</label>
+                                <label class="block text-slate-400 mb-1">{{ t('nagad_sales', 'Nagad (৳)') }}</label>
                                 <input 
                                     type="number" 
                                     step="0.01" 
@@ -118,11 +121,22 @@ const submit = () => {
                             </div>
 
                             <div>
-                                <label class="block text-slate-400 mb-1">Card / Bank (৳)</label>
+                                <label class="block text-slate-400 mb-1">{{ t('card_bank_sales', 'Card / Bank (৳)') }}</label>
                                 <input 
                                     type="number" 
                                     step="0.01" 
                                     v-model="form.card_bank_sales" 
+                                    placeholder="0.00"
+                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-white font-mono focus:border-amber-500 focus:outline-none"
+                                />
+                            </div>
+
+                            <div class="col-span-2">
+                                <label class="block text-slate-400 mb-1">{{ t('other_sales', 'Other Channels (৳)') }}</label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    v-model="form.other_sales" 
                                     placeholder="0.00"
                                     class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-white font-mono focus:border-amber-500 focus:outline-none"
                                 />

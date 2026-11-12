@@ -23,7 +23,7 @@ class StockBatch extends Model
     ];
 
     protected $casts = [
-        'received_date' => 'date',
+        'received_date' => 'date:Y-m-d',
         'initial_quantity' => 'decimal:4',
         'remaining_quantity' => 'decimal:4',
         'unit_cost' => 'decimal:4',
@@ -50,4 +50,3 @@ class StockBatch extends Model
         return $this->hasMany(ConsumptionItem::class);
     }
 }
-

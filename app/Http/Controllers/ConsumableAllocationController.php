@@ -54,4 +54,3 @@ class ConsumableAllocationController extends Controller
         return redirect()->back()->with('success', 'Consumable cost amortization schedule created.');
     }
 }
-

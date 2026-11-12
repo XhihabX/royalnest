@@ -3,6 +3,9 @@ import { ref, computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Flame, Plus, Trash2, AlertTriangle, CheckCircle2 } from 'lucide-vue-next';
+import { useI18n } from '@/Composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
     consumptions: Array,
@@ -75,9 +78,9 @@ const submit = () => {
     <AppLayout title="Daily Ingredient Consumption">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-white tracking-tight">Daily Ingredient Consumption Entry</h1>
+                <h1 class="text-2xl font-bold text-white tracking-tight">{{ t('consumption', 'Daily Ingredient Consumption Entry') }}</h1>
                 <p class="text-xs text-slate-400 mt-1">
-                    Manual end-of-day ingredient usage recording with strict Negative Stock Prevention and moving-average cost deduction.
+                    {{ t('consumption_desc', 'Manual end-of-day ingredient usage recording with strict Negative Stock Prevention and FIFO lot deduction.') }}
                 </p>
             </div>
 
@@ -86,7 +89,7 @@ const submit = () => {
                 class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer"
             >
                 <Plus class="w-4 h-4" />
-                <span>Record Daily Consumption</span>
+                <span>{{ t('record_consumption', 'Record Daily Consumption') }}</span>
             </button>
         </div>
 
