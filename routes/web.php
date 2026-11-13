@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CashReconciliationController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ConsumableAllocationController;
 use App\Http\Controllers\ConsumptionController;
 use App\Http\Controllers\DailySalesController;
@@ -12,11 +14,15 @@ use App\Http\Controllers\FinancialAccountController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfitCalculatorController;
 use App\Http\Controllers\PurchaseController;
+use App\Http\Controllers\RecycleBinController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SmartCostController;
 use App\Http\Controllers\StockCountController;
 use App\Http\Controllers\StockLedgerController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\TransactionReversalController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\VoiceLookupController;
 use App\Http\Controllers\WastageController;
 use Illuminate\Support\Facades\Route;
 
@@ -113,6 +119,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin,owner')->group(function () {
         // Financial Accounts
         Route::get('/accounts', [FinancialAccountController::class, 'index'])->name('accounts.index');
+        Route::post('/accounts', [FinancialAccountController::class, 'store'])->name('accounts.store');
+        Route::put('/accounts/{account}', [FinancialAccountController::class, 'update'])->name('accounts.update');
         Route::post('/accounts/transfer', [FinancialAccountController::class, 'transfer'])->name('accounts.transfer');
         Route::post('/accounts/adjust', [FinancialAccountController::class, 'adjust'])->name('accounts.adjust');
         Route::post('/accounts/{account}/toggle-status', [FinancialAccountController::class, 'toggleStatus'])->name('accounts.toggle-status');
@@ -122,5 +130,47 @@ Route::middleware('auth')->group(function () {
 
         // True Profit & Loss Reporting
         Route::get('/reports/profit-loss', [ReportController::class, 'profitLoss'])->name('reports.profit-loss');
+
+        // Activity Audit Logs
+        Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
+        Route::get('/audit-logs/export', [AuditLogController::class, 'exportCsv'])->name('audit-logs.export');
+
+        // Centralized Recycle Bin & Recovery
+        Route::get('/recycle-bin', [RecycleBinController::class, 'index'])->name('recycle-bin.index');
+        Route::post('/recycle-bin/restore', [RecycleBinController::class, 'restore'])->name('recycle-bin.restore');
+        Route::delete('/recycle-bin/purge', [RecycleBinController::class, 'purge'])->name('recycle-bin.purge');
+
+        // User Management & RBAC
+        Route::get('/users', [UserController::class, 'index'])->name('users.index');
+        Route::post('/users', [UserController::class, 'store'])->name('users.store');
+        Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
+        Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+        Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+    });
+
+    // Voice Database Fresh Lookup API (All authenticated roles)
+    Route::get('/api/voice/lookup', [VoiceLookupController::class, 'lookup'])->name('api.voice.lookup');
+
+    // Product & Category Updates / Soft Deletes
+    Route::middleware('role:manager')->group(function () {
+        Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
+        Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+        Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
+        Route::put('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
+        Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+        Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
+        Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
+    });
+
+    // Financial Reversals & Voids (Authorized Managers, Admins, Owners)
+    Route::middleware('role:manager')->group(function () {
+        Route::post('/purchases/{purchase}/void', [TransactionReversalController::class, 'voidPurchase'])->name('purchases.void');
+        Route::post('/supplier-payments/{payment}/void', [TransactionReversalController::class, 'voidSupplierPayment'])->name('supplier-payments.void');
+        Route::post('/suppliers/{supplier}/refund', [TransactionReversalController::class, 'recordSupplierRefund'])->name('suppliers.refund');
+        Route::post('/salary-payments/{payment}/void', [TransactionReversalController::class, 'voidSalaryPayment'])->name('salary-payments.void');
+        Route::post('/employee-advances/{advance}/void', [TransactionReversalController::class, 'voidEmployeeAdvance'])->name('employee-advances.void');
+        Route::post('/employee-advances/{advance}/repayment', [TransactionReversalController::class, 'recordAdvanceRepayment'])->name('employee-advances.repayment');
+        Route::post('/expenses/{expense}/void', [TransactionReversalController::class, 'voidExpense'])->name('expenses.void');
+        Route::post('/sales/{sale}/void', [TransactionReversalController::class, 'voidDailySale'])->name('sales.void');
     });
 });

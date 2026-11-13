@@ -20,6 +20,7 @@ import {
     ArrowRight
 } from 'lucide-vue-next';
 import { useI18n } from '../../Composables/useI18n';
+import VoiceInputButton from '@/Components/Voice/VoiceInputButton.vue';
 
 const props = defineProps({
     suppliers: Array,
@@ -37,6 +38,15 @@ const status = ref(props.filters?.status || 'all');
 const showAddModal = ref(false);
 const showProductModal = ref(false);
 const activeSupplier = ref(null);
+
+const handleVoiceApply = (parsed) => {
+    if (parsed.item_name) {
+        addForm.name = parsed.item_name;
+        addForm.company_name = parsed.item_name;
+    }
+    if (parsed.note) addForm.notes = parsed.note;
+    showAddModal.value = true;
+};
 
 const applyFilters = () => {
     router.get('/suppliers/directory', {
@@ -244,14 +254,23 @@ const statusColors = {
                     </select>
                 </div>
 
-                <button
-                    type="button"
-                    @click="showAddModal = true"
-                    class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-lg shadow-amber-950 transition active:scale-95 shrink-0"
-                >
-                    <Plus class="w-4 h-4" />
-                    <span>{{ t('add_supplier', 'Add to Directory') }}</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    <VoiceInputButton
+                        context-type="suppliers"
+                        title="সরবরাহকারী ভয়েস টাইপিং"
+                        hint='যেমন: "রহিম ডেইরি ফার্ম, মোবাইল ০১৭১১..."'
+                        @apply="handleVoiceApply"
+                    />
+
+                    <button
+                        type="button"
+                        @click="showAddModal = true"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-lg shadow-amber-950 transition active:scale-95 shrink-0 min-h-[40px]"
+                    >
+                        <Plus class="w-4 h-4" />
+                        <span>{{ t('add_supplier', 'Add to Directory') }}</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Supplier Directory Table -->

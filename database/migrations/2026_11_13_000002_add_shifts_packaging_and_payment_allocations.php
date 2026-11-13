@@ -34,15 +34,18 @@ return new class extends Migration
             $table->string('product_type', 50)->default('raw_material')->change();
         });
 
-        Category::firstOrCreate(
-            ['slug' => 'packaging-materials'],
-            [
+        $existingPkg = DB::table('categories')->where('slug', 'packaging-materials')->first();
+        if (!$existingPkg) {
+            DB::table('categories')->insert([
+                'slug' => 'packaging-materials',
                 'name' => 'Packaging Materials',
                 'type' => 'packaging',
                 'description' => 'Polythene bags, food packaging, takeaway boxes, and foil',
                 'is_active' => true,
-            ]
-        );
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         // 4. Multi-bill and partial-bill supplier payment allocations
         Schema::create('supplier_payment_allocations', function (Blueprint $table) {

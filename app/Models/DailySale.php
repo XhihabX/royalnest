@@ -21,6 +21,12 @@ class DailySale extends Model
         'discrepancy_amount',
         'notes',
         'created_by',
+        'reversal_status',
+        'reversal_type',
+        'reversed_at',
+        'reversed_by',
+        'reversal_reason',
+        'compensating_transaction_id',
     ];
 
     protected $casts = [
@@ -32,6 +38,7 @@ class DailySale extends Model
         'card_bank_sales' => 'decimal:2',
         'other_sales' => 'decimal:2',
         'discrepancy_amount' => 'decimal:2',
+        'reversed_at' => 'datetime',
     ];
 
     public function creator(): BelongsTo

@@ -22,12 +22,19 @@ class EmployeeAdvance extends Model
         'remaining_balance',
         'status',
         'created_by',
+        'reversal_status',
+        'reversal_type',
+        'reversed_at',
+        'reversed_by',
+        'reversal_reason',
+        'compensating_transaction_id',
     ];
 
     protected $casts = [
         'advance_date' => 'date:Y-m-d',
         'amount' => 'decimal:2',
         'remaining_balance' => 'decimal:2',
+        'reversed_at' => 'datetime',
     ];
 
     public function employee(): BelongsTo

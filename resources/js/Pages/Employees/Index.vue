@@ -25,6 +25,7 @@ import {
     ArrowUpRight
 } from 'lucide-vue-next';
 import { useI18n } from '../../Composables/useI18n';
+import VoiceInputButton from '@/Components/Voice/VoiceInputButton.vue';
 
 const props = defineProps({
     employees: Array,
@@ -48,6 +49,13 @@ const showCameraModal = ref(false);
 const cameraTarget = ref('photo');
 const showImageModal = ref(false);
 const viewImageUrl = ref('');
+
+const handleVoiceApply = (parsed) => {
+    if (parsed.item_name) empForm.name = parsed.item_name;
+    if (parsed.amount) empForm.agreed_salary = parsed.amount;
+    if (parsed.shift) empForm.assigned_shift = parsed.shift;
+    showEmployeeModal.value = true;
+};
 const viewImageTitle = ref('');
 
 const applyFilters = () => {
@@ -157,9 +165,16 @@ const submitEmployee = () => {
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
+                    <VoiceInputButton
+                        context-type="employees"
+                        title="কর্মী ভয়েস টাইপিং"
+                        hint='যেমন: "করিম, কিচেন শেফ, বেতন ১২০০০ টাকা"'
+                        @apply="handleVoiceApply"
+                    />
+
                     <Link
                         href="/employees/attendance/bulk"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition shadow active:scale-95"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition shadow active:scale-95 min-h-[40px]"
                     >
                         <CalendarCheck class="w-4 h-4 text-emerald-400" />
                         <span>{{ t('bulk_attendance', 'Bulk Attendance Entry') }}</span>
@@ -168,7 +183,7 @@ const submitEmployee = () => {
                     <button
                         type="button"
                         @click="showEmployeeModal = true"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-lg shadow-amber-950 transition active:scale-95 shrink-0 cursor-pointer"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-lg shadow-amber-950 transition active:scale-95 shrink-0 cursor-pointer min-h-[40px]"
                     >
                         <Plus class="w-4 h-4" />
                         <span>{{ t('add_employee', 'Add Staff Member') }}</span>

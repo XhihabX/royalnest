@@ -24,6 +24,8 @@ class HandleInertiaRequests extends Middleware
                     'name' => $request->user()->name,
                     'email' => $request->user()->email,
                     'role' => $request->user()->primary_role,
+                    'is_super_admin' => (bool) $request->user()->is_super_admin,
+                    'is_visitor' => $request->user()->primary_role === 'visitor' || $request->user()->hasRole('visitor'),
                 ] : null,
             ],
             'unmarked_staff_count' => $request->user() ? count(app(\App\Services\EmployeeService::class)->getMissingAttendanceAlerts(now()->toDateString())) : 0,

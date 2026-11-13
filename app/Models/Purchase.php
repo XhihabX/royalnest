@@ -21,6 +21,12 @@ class Purchase extends Model
         'is_purchase_and_consume',
         'notes',
         'created_by',
+        'reversal_status',
+        'reversal_type',
+        'reversed_at',
+        'reversed_by',
+        'reversal_reason',
+        'compensating_transaction_id',
     ];
 
     protected $casts = [
@@ -28,6 +34,7 @@ class Purchase extends Model
         'total_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'is_purchase_and_consume' => 'boolean',
+        'reversed_at' => 'datetime',
     ];
 
     public function supplier(): BelongsTo

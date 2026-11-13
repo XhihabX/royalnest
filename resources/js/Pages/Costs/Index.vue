@@ -23,10 +23,16 @@ import {
     Store,
     Layers,
     X,
-    Check
+    Check,
+    Download,
+    Printer,
+    FileText,
+    Calendar,
+    Ban
 } from 'lucide-vue-next';
 import { useI18n } from '@/Composables/useI18n';
-import { useVoiceCostParser } from '@/Composables/useVoiceCostParser';
+import UniversalVoiceModal from '@/Components/Voice/UniversalVoiceModal.vue';
+import VoiceInputButton from '@/Components/Voice/VoiceInputButton.vue';
 
 const props = defineProps({
     templates: Object,
@@ -37,6 +43,7 @@ const props = defineProps({
     accounts: Array,
     recentPurchases: Array,
     recentExpenses: Array,
+    dailySummary: Object,
     selectedDate: String,
     filters: Object,
 });
@@ -117,48 +124,51 @@ watch(transcript, (newText) => {
     }
 });
 
-const applyVoiceToForm = () => {
-    if (!voicePreview.value) return;
-    const p = voicePreview.value;
-
-    if (p.transaction_type) {
-        activeTab.value = p.transaction_type;
-        form.transaction_type = p.transaction_type;
+const onVoiceApply = (parsed) => {
+    if (parsed.item_name) form.name = parsed.item_name;
+    if (parsed.product_id) {
+        form.product_id = parsed.product_id;
+        activeTab.value = 'purchase';
     }
-
-    if (p.name) {
-        form.name = p.name;
-        // Attempt product match
-        const matchedProd = props.products.find(prod => 
-            prod.name.toLowerCase().includes(p.name.toLowerCase()) || 
-            p.name.toLowerCase().includes(prod.name.toLowerCase())
-        );
-        if (matchedProd) {
-            form.product_id = matchedProd.id;
-            form.unit = matchedProd.purchase_unit || matchedProd.base_unit;
-        }
+    if (parsed.supplier_id) form.supplier_id = parsed.supplier_id;
+    if (parsed.employee_id) {
+        form.employee_id = parsed.employee_id;
+        activeTab.value = 'salary_payment';
     }
-
-    if (p.quantity) form.quantity = p.quantity;
-    if (p.unit) form.unit = p.unit;
-    if (p.unit_price) form.unit_price = p.unit_price;
-    if (p.amount) {
-        form.amount = p.amount;
-        form.paid_amount = p.amount;
+    if (parsed.quantity) form.quantity = parsed.quantity;
+    if (parsed.unit) form.unit = parsed.unit;
+    if (parsed.amount) {
+        form.amount = parsed.amount;
+        form.paid_amount = parsed.amount;
     }
-    if (p.expense_category) form.expense_category = p.expense_category;
+    if (parsed.note) form.notes = parsed.note;
+};
 
-    // Match payment account
-    if (p.payment_method) {
-        const matchedAcc = props.accounts.find(a => a.type === p.payment_method) || props.accounts[0];
-        if (matchedAcc) form.payment_account_id = matchedAcc.id;
+const handleDateChange = (newDate) => {
+    router.get('/daily-costs', { date: newDate }, { preserveState: true, preserveScroll: true });
+};
+
+const handleVoidPurchase = (purchase) => {
+    const reason = prompt(`ইনভয়েস #${purchase.invoice_no} বাতিল (Void) করার কারণ লিখুন:`);
+    if (reason && reason.trim()) {
+        router.post(`/purchases/${purchase.id}/void`, {
+            reason: reason.trim(),
+            allow_partial_return: true,
+        });
     }
+};
 
-    if (p.notes) form.notes = p.notes;
+const handleVoidExpense = (expense) => {
+    const reason = prompt(`খরচ #${expense.id} (${expense.category}) বাতিল (Void) করার কারণ লিখুন:`);
+    if (reason && reason.trim()) {
+        router.post(`/expenses/${expense.id}/void`, {
+            reason: reason.trim(),
+        });
+    }
+};
 
-    showVoiceBox.value = false;
-    clearVoiceInput();
-    voicePreview.value = null;
+const printSummary = () => {
+    window.print();
 };
 
 // Apply saved shortcut template to the form
@@ -295,126 +305,122 @@ const toggleFav = (tplId) => {
             <div>
                 <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
                     <Sparkles class="w-6 h-6 text-amber-400" />
-                    <span>{{ t('smart_cost_entry', 'Smart Daily Cost Entry') }}</span>
+                    <span>{{ t('smart_cost_entry', 'দৈনিক খরচ ও ক্রয় এন্ট্রি (Daily Costs)') }}</span>
                 </h1>
                 <p class="text-xs text-slate-400 mt-1">
-                    {{ t('smart_cost_desc', 'Ultra-fast daily cost recording with voice typing, reusable shortcuts, and automated financial synchronization.') }}
+                    ভয়েস টাইপিং, শর্টকাট এবং স্বয়ংক্রিয় হিসাব সমন্বয়
                 </p>
             </div>
 
             <div class="flex items-center space-x-2">
-                <!-- Voice Typing Toggle Button -->
-                <button
-                    type="button"
-                    @click="showVoiceBox = !showVoiceBox"
-                    :class="[
-                        'inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-lg cursor-pointer border',
-                        isListening
-                            ? 'bg-rose-600 text-white border-rose-500 animate-pulse shadow-rose-600/30'
-                            : 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-400/80 shadow-amber-500/20'
-                    ]"
-                >
-                    <Mic v-if="!isListening" class="w-4 h-4" />
-                    <MicOff v-else class="w-4 h-4" />
-                    <span>{{ isListening ? 'রেকর্ডিং হচ্ছে (Listening...)' : 'ভয়েস টাইপিং (Voice Input)' }}</span>
-                </button>
+                <VoiceInputButton
+                    context-type="costs"
+                    title="দৈনিক খরচ ভয়েস টাইপিং"
+                    hint='যেমন: "আলু ৫ কেজি ৫০০ টাকা ক্যাশ" বা " রহিম কে ৫০০ টাকা বেতন দিয়েছি"'
+                    @apply="onVoiceApply"
+                />
             </div>
         </div>
 
-        <!-- Voice Assistant Panel (When toggled or active) -->
-        <div v-if="showVoiceBox" class="bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/30 rounded-2xl p-5 mb-6 shadow-xl animate-fade-in">
-            <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 rounded-full" :class="isListening ? 'bg-rose-500 animate-ping' : 'bg-amber-400'"></div>
-                    <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">Browser Web Speech Assistant</span>
-                    <span class="text-[11px] text-slate-400 font-mono">(100% Free • No External API Required)</span>
+        <!-- Instant Daily Breakdown Summary Card -->
+        <div v-if="dailySummary" class="bg-slate-900 border border-slate-800 rounded-3xl p-5 mb-6 shadow-xl space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-800/80">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+                        <FileText class="w-4 h-4" />
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold text-white">দৈনিক আর্থিক সারাংশ (Daily Financial Breakdown)</h2>
+                        <span class="text-[11px] text-slate-400 font-mono">{{ selectedDate }} এর হিসাব বিবরণী</span>
+                    </div>
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <select
-                        v-model="voiceLanguage"
-                        class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] text-slate-200 font-medium focus:outline-none"
-                    >
-                        <option value="bn-BD">বাংলা (Bengali)</option>
-                        <option value="en-US">English (US)</option>
-                    </select>
+                    <input
+                        type="date"
+                        :value="selectedDate"
+                        @change="handleDateChange($event.target.value)"
+                        class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:border-amber-500 font-mono"
+                    />
 
-                    <button 
-                        @click="showVoiceBox = false" 
-                        class="text-slate-400 hover:text-white p-1 rounded-lg"
+                    <button
+                        type="button"
+                        @click="printSummary"
+                        class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition flex items-center gap-1.5"
                     >
-                        <X class="w-4 h-4" />
+                        <Printer class="w-3.5 h-3.5" />
+                        <span>প্রিন্ট / সেভ</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Listening Status & Waveform -->
-            <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-4 mb-3">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs text-slate-400">
-                        {{ isListening ? 'বলুন... (Speak naturally, e.g. "আজকে পাঁচ কেজি শসা কিনেছি, প্রতি কেজি চল্লিশ টাকা")' : 'মাইক্রোফোনে ক্লিক করে কথা বলুন' }}
+            <!-- 6 Strict Accounting Metrics Tiles -->
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+                <!-- 1. Raw Materials Purchases -->
+                <div class="p-3 bg-slate-950 rounded-2xl border border-slate-800">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">
+                        কাঁচামাল ক্রয় (Asset)
                     </span>
-                    <div class="flex items-center gap-2">
-                        <button
-                            v-if="!isListening"
-                            type="button"
-                            @click="startListening"
-                            class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
-                        >
-                            <Mic class="w-3.5 h-3.5" />
-                            <span>Start Dictation</span>
-                        </button>
-                        <button
-                            v-else
-                            type="button"
-                            @click="stopListening"
-                            class="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
-                        >
-                            <MicOff class="w-3.5 h-3.5" />
-                            <span>Stop</span>
-                        </button>
-                        <button
-                            type="button"
-                            @click="clearVoiceInput"
-                            class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition"
-                        >
-                            Clear
-                        </button>
-                    </div>
+                    <span class="text-sm font-extrabold text-amber-400 font-mono block">
+                        ৳{{ Number(dailySummary.raw_material_purchases).toLocaleString() }}
+                    </span>
+                    <span class="text-[9px] text-slate-500">ইনভেন্টরি অ্যাসেট বৃদ্ধি</span>
                 </div>
 
-                <div class="text-sm font-medium text-white min-h-[38px] flex items-center">
-                    <span v-if="transcript" class="text-white">{{ transcript }}</span>
-                    <span v-else-if="interimTranscript" class="text-slate-400 italic">{{ interimTranscript }}</span>
-                    <span v-else class="text-slate-600 italic">Dictated speech will appear here...</span>
+                <!-- 2. Packaging Purchases -->
+                <div class="p-3 bg-slate-950 rounded-2xl border border-slate-800">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">
+                        প্যাকেজিং ক্রয় (Asset)
+                    </span>
+                    <span class="text-sm font-extrabold text-amber-300 font-mono block">
+                        ৳{{ Number(dailySummary.packaging_purchases).toLocaleString() }}
+                    </span>
+                    <span class="text-[9px] text-slate-500">বক্স, ফয়েল, ক্যারিব্যাগ</span>
                 </div>
 
-                <div v-if="voiceError" class="mt-2 text-xs text-rose-400 flex items-center gap-1.5">
-                    <AlertCircle class="w-3.5 h-3.5" />
-                    <span>{{ voiceError }}</span>
-                </div>
-            </div>
-
-            <!-- Parsed Preview & Fill Form Button -->
-            <div v-if="voicePreview" class="bg-slate-900 border border-amber-500/20 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-                <div class="flex flex-wrap items-center gap-3">
-                    <span class="text-amber-400 font-bold uppercase tracking-wider text-[11px]">Interpreted:</span>
-                    <span v-if="voicePreview.name" class="bg-slate-800 text-white px-2 py-0.5 rounded font-medium">Item: {{ voicePreview.name }}</span>
-                    <span v-if="voicePreview.quantity" class="bg-slate-800 text-white px-2 py-0.5 rounded font-mono">Qty: {{ voicePreview.quantity }} {{ voicePreview.unit }}</span>
-                    <span v-if="voicePreview.unit_price" class="bg-slate-800 text-white px-2 py-0.5 rounded font-mono">Rate: ৳{{ voicePreview.unit_price }}</span>
-                    <span v-if="voicePreview.amount" class="bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded font-mono font-bold">Total: ৳{{ voicePreview.amount }}</span>
-                    <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded">Type: {{ voicePreview.transaction_type }}</span>
-                    <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded">Account: {{ voicePreview.payment_method }}</span>
+                <!-- 3. Operating Expenses -->
+                <div class="p-3 bg-slate-950 rounded-2xl border border-slate-800">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">
+                        পরিচালন খরচ (P&L)
+                    </span>
+                    <span class="text-sm font-extrabold text-rose-400 font-mono block">
+                        ৳{{ Number(dailySummary.operating_expenses).toLocaleString() }}
+                    </span>
+                    <span class="text-[9px] text-slate-500">গ্যাস, বিদ্যুৎ, ভাড়া ইত্যাদি</span>
                 </div>
 
-                <button
-                    type="button"
-                    @click="applyVoiceToForm"
-                    class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition cursor-pointer"
-                >
-                    <Check class="w-4 h-4" />
-                    <span>Apply to Form (ফর্ম পূরণ করুন)</span>
-                </button>
+                <!-- 4. Liability Outflows -->
+                <div class="p-3 bg-slate-950 rounded-2xl border border-slate-800">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">
+                        দেনা পরিশোধ ও অগ্রিম
+                    </span>
+                    <span class="text-sm font-extrabold text-indigo-300 font-mono block">
+                        ৳{{ Number(dailySummary.total_liability_outflows).toLocaleString() }}
+                    </span>
+                    <span class="text-[9px] text-slate-500">বাকি শোধ / বেতন / অগ্রিম</span>
+                </div>
+
+                <!-- 5. Gross Sales -->
+                <div class="p-3 bg-slate-950 rounded-2xl border border-slate-800">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">
+                        মোট বিক্রয় (Sales)
+                    </span>
+                    <span class="text-sm font-extrabold text-emerald-400 font-mono block">
+                        ৳{{ Number(dailySummary.gross_sales).toLocaleString() }}
+                    </span>
+                    <span class="text-[9px] text-slate-500">ক্যাশ ও ডিজিটাল বিক্রয়</span>
+                </div>
+
+                <!-- 6. FIFO COGS -->
+                <div class="p-3 bg-slate-950 rounded-2xl border border-slate-800">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">
+                        খাবার খরচ (COGS)
+                    </span>
+                    <span class="text-sm font-extrabold text-cyan-400 font-mono block">
+                        ৳{{ Number(dailySummary.cogs).toLocaleString() }}
+                    </span>
+                    <span class="text-[9px] text-slate-500">রান্নাঘরে ব্যবহৃত কাঁচামাল</span>
+                </div>
             </div>
         </div>
 
@@ -864,7 +870,18 @@ const toggleFav = (tplId) => {
                         </div>
                         <div class="flex items-center justify-between mt-2 pt-1 border-t border-slate-900 text-[10px] text-slate-500">
                             <span>Paid: ৳{{ p.paid_amount }}</span>
-                            <span v-if="p.is_purchase_and_consume" class="text-amber-400">Direct Consumed</span>
+                            <div class="flex items-center gap-2">
+                                <span v-if="p.is_purchase_and_consume" class="text-amber-400">Direct Consumed</span>
+                                <button
+                                    v-if="p.reversal_status !== 'voided'"
+                                    type="button"
+                                    @click="handleVoidPurchase(p)"
+                                    class="text-rose-400 hover:text-rose-300 font-bold underline"
+                                >
+                                    বাতিল (Void)
+                                </button>
+                                <span v-else class="text-rose-500 font-bold uppercase">বাতিলকৃত (Voided)</span>
+                            </div>
                         </div>
                     </div>
 
@@ -875,6 +892,17 @@ const toggleFav = (tplId) => {
                             <span class="text-slate-300 font-mono">৳{{ e.amount }}</span>
                         </div>
                         <p class="text-[11px] text-slate-400">{{ e.payee || e.notes || 'Operating expense' }}</p>
+                        <div class="flex items-center justify-end mt-2 pt-1 border-t border-slate-900 text-[10px]">
+                            <button
+                                v-if="e.reversal_status !== 'voided'"
+                                type="button"
+                                @click="handleVoidExpense(e)"
+                                class="text-rose-400 hover:text-rose-300 font-bold underline"
+                            >
+                                বাতিল (Void)
+                            </button>
+                            <span v-else class="text-rose-500 font-bold uppercase">বাতিলকৃত (Voided)</span>
+                        </div>
                     </div>
 
                     <div v-if="recentPurchases.length === 0 && recentExpenses.length === 0" class="text-center py-8 text-xs text-slate-500 italic">

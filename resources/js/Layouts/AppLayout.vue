@@ -27,7 +27,10 @@ import {
     X,
     ChevronRight,
     Clock,
-    ArrowUpRight
+    ArrowUpRight,
+    ShieldCheck,
+    Archive,
+    UserCog
 } from 'lucide-vue-next';
 import { useI18n } from '../Composables/useI18n';
 
@@ -62,6 +65,9 @@ const navItems = computed(() => [
     { label: t('accounts', 'Cash & Accounts'), href: '/accounts', icon: Landmark },
     { label: t('transactions_report', 'Daily Purchases & Expenses'), href: '/reports/transactions', icon: Receipt },
     { label: t('reports', 'Profit & Loss'), href: '/reports/profit-loss', icon: TrendingUp },
+    { label: t('audit_logs', 'Activity Audit Logs'), href: '/audit-logs', icon: ShieldCheck },
+    { label: t('recycle_bin', 'Recycle Bin'), href: '/recycle-bin', icon: Archive },
+    { label: t('users', 'User Accounts & Roles'), href: '/users', icon: UserCog },
 ]);
 
 // Grouped items for mobile drawer
@@ -84,6 +90,12 @@ const mobileFinanceItems = computed(() => [
     { label: t('transactions_report', 'Daily Purchases & Expenses'), href: '/reports/transactions', icon: Receipt },
     { label: t('accounts', 'Cash Drawer & Bank'), href: '/accounts', icon: Landmark },
     { label: t('reports', 'Profit & Loss Statement'), href: '/reports/profit-loss', icon: TrendingUp },
+]);
+
+const mobileAdminItems = computed(() => [
+    { label: t('audit_logs', 'Activity Logs'), href: '/audit-logs', icon: ShieldCheck },
+    { label: t('recycle_bin', 'Recycle Bin'), href: '/recycle-bin', icon: Archive },
+    { label: t('users', 'User Management'), href: '/users', icon: UserCog },
 ]);
 
 const isActive = (href) => {
@@ -356,6 +368,30 @@ const handleLogout = () => {
                     </div>
                 </div>
 
+                <!-- Section 3: System & Security -->
+                <div>
+                    <h3 class="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-2">
+                        {{ t('system_security', 'সিস্টেম ও সিকিউরিটি') }}
+                    </h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <Link
+                            v-for="item in mobileAdminItems"
+                            :key="item.href"
+                            :href="item.href"
+                            @click="showMobileMenu = false"
+                            :class="[
+                                'p-2.5 rounded-xl border flex items-center space-x-2 transition text-xs',
+                                isActive(item.href) 
+                                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-200 font-bold' 
+                                    : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
+                            ]"
+                        >
+                            <component :is="item.icon" class="w-4 h-4 text-amber-400 shrink-0" />
+                            <span class="truncate">{{ item.label }}</span>
+                        </Link>
+                    </div>
+                </div>
+
                 <!-- Section 2: Finance & Suppliers -->
                 <div>
                     <h3 class="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-2">
@@ -364,6 +400,30 @@ const handleLogout = () => {
                     <div class="grid grid-cols-2 gap-2">
                         <Link
                             v-for="item in mobileFinanceItems"
+                            :key="item.href"
+                            :href="item.href"
+                            @click="showMobileMenu = false"
+                            :class="[
+                                'p-2.5 rounded-xl border flex items-center space-x-2 transition text-xs',
+                                isActive(item.href) 
+                                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-200 font-bold' 
+                                    : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
+                            ]"
+                        >
+                            <component :is="item.icon" class="w-4 h-4 text-amber-400 shrink-0" />
+                            <span class="truncate">{{ item.label }}</span>
+                        </Link>
+                    </div>
+                </div>
+
+                <!-- Section 3: System & Security -->
+                <div>
+                    <h3 class="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-2">
+                        {{ t('system_security', 'সিস্টেম ও সিকিউরিটি') }}
+                    </h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <Link
+                            v-for="item in mobileAdminItems"
                             :key="item.href"
                             :href="item.href"
                             @click="showMobileMenu = false"

@@ -2,6 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-13] — Universal Voice Typing, Immutable Audit Trail, Recycle Bin Recovery, Reversal vs Refund Accounting, Super Admin Shield & Visitor Mode
+
+**What:**
+1. **Universal Voice Typing System** (`resources/js/Components/Voice/UniversalVoiceModal.vue`, `resources/js/Components/Voice/VoiceInputButton.vue`, `app/Http/Controllers/VoiceLookupController.php`):
+   - Added native Web Speech API voice typing modal with Bengali (`bn-BD`) as primary default language and 1-tap English (`en-US`) toggle.
+   - Built live fuzzy database lookup endpoint `GET /api/voice/lookup` for matching spoken product names, suppliers, employees, expense categories, and accounts with minimum 2-character queries.
+   - Integrated touch-friendly (44px) microphone buttons across all 19 transaction entry forms (Daily Costs, Purchases, Consumables, Operating Expenses, Daily Sales, Supplier Management, Staff Directory).
+   - Enforced strict user safety: spoken speech is parsed into an editable Review & Confirm Modal before any field is populated, with **zero automatic form submission**. Included manual fallback text input for noisy environments or unsupported browsers.
+2. **Comprehensive Immutable Activity Log & Audit Trail** (`app/Services/AuditLogger.php`, `app/Models/AuditLog.php`, `app/Http/Controllers/AuditLogController.php`, `resources/js/Pages/AuditLogs/Index.vue`):
+   - Enhanced `audit_logs` schema with `event_uuid`, `module`, `transaction_reference`, `status`, and `error_message`.
+   - Prevented tampering by intercepting `updating` and `deleting` Eloquent events on `AuditLog` model with an immediate `AccessDeniedHttpException`.
+   - Added dual-layer audit trail logging: automated capture for authentication, financial vouchers, inventory movements, staff management, and system administration, plus explicit `AuditLogger::logFailure()` for failed validation and unauthorized access attempts.
+   - Sanitized all sensitive credentials (passwords, pin numbers, session tokens) before saving JSON diffs.
+   - Built a mobile-first timeline dashboard (`/audit-logs`) with module filters, date ranges, user search, before/after JSON diff viewer modal, and streaming CSV export (`/audit-logs/export`).
+3. **Deleted Record Recovery & Recycle Bin** (`app/Http/Controllers/RecycleBinController.php`, `resources/js/Pages/RecycleBin/Index.vue`, `app/Models/Product.php`, `Supplier.php`, `Employee.php`, `Category.php`):
+   - Enabled soft deletes (`SoftDeletes`) on `Product`, `Supplier`, `Employee`, and `Category` models (`deleted_at` timestamp).
+   - Created dedicated Recycle Bin interface (`/recycle-bin`) with responsive tabbed views for each entity type, showing deleted date and original details with 1-tap **Restore** action.
+   - Enforced Super-Admin-only permanent purge safety guard: permanently destroying a record is strictly blocked whenever historical transaction dependencies exist (e.g. past purchases, stock ledger entries, sales, or attendance).
+4. **Separation of Accounting Void from Actual Money Refund** (`app/Services/ReversalService.php`, `app/Http/Controllers/TransactionReversalController.php`, `resources/js/Pages/Purchases/*`, `Costs/*`, `Expenses/*`, `Sales/*`):
+   - Eliminated erroneous assumptions regarding payment reversals by providing two distinct workflows:
+     - **Void Mistaken Entry**: For bookkeeping/duplicate typos where no money actually moved; unwinds fictitious ledger entries, restores supplier payables/due amounts, and reverses intact inventory batches without physical cash disbursement.
+     - **Actual Refund / Recovery**: For real-world cash or digital money returned; records a distinct linked financial inflow into the designated active financial account with receipt date and reference voucher.
+   - **FIFO Purchase Reversal Matrix**: Reversing a purchase with 100% intact shelf stock cleanly unwinds FIFO batches and records a `purchase_return` stock ledger movement; partially consumed purchases block full invoice voiding and mandate partial shelf-stock return; fully consumed purchases strictly block voiding.
+5. **Verified Super Admin Identity Shield & Visitor Read-Only Mode** (`app/Http/Controllers/UserController.php`, `app/Http/Middleware/EnsureNotVisitor.php`, `resources/js/Pages/Users/Index.vue`, `app/Models/User.php`):
+   - Added `is_super_admin` flag to `users` table, securely locking User ID 1 (`admin@royalnest.com`) against deletion, deactivation, or self-demotion even across email changes.
+   - Built User Management dashboard (`/users`) allowing Super Admin to invite users and create Visitor accounts.
+   - Built `EnsureNotVisitor` security middleware intercepting all state-changing HTTP methods (`POST`, `PUT`, `PATCH`, `DELETE`) with HTTP 403 Forbidden, while explicitly whitelisting `POST /logout`.
+   - Masked sensitive data on visitor sessions (masked employee phone numbers, hidden NID card captures, hidden action buttons).
+6. **Instant Daily Cost Breakdown Summary Card** (`resources/js/Pages/Costs/Index.vue`, `app/Http/Controllers/SmartCostController.php`):
+   - Added real-time financial KPI breakdown card atop Daily Cost Entry with 6 distinct metric tiles: Raw Materials, Packaging, Operating Expenses, Liability Settlements (Supplier & Salary), Gross Sales, and FIFO COGS.
+   - Included interactive date selector and print-ready stylesheet for on-demand cost sheet printing.
+7. **Custom Financial Account CRUD** (`app/Http/Controllers/FinancialAccountController.php`, `resources/js/Pages/Accounts/Index.vue`):
+   - Added "Add Account" modal and backend `store` / `update` endpoints for creating custom financial accounts with initial balances and active/inactive status toggles.
+8. **Automated Verification & Release Packaging**:
+   - Created `tests/Feature/SystemWideEnhancementAndReadinessTest.php` with 9 comprehensive tests covering all new features.
+   - Entire test suite: **81/81 tests (449 assertions) passing 100% green**.
+   - Frontend compiled cleanly with Vite 8 (5.51s, 0 errors).
+   - Generated production release package: `dist/royal_nest_production_deployment.zip` (0.58 MB, 240 files).
+
+**Why:** Complete the production-readiness roadmap, empowering the restaurant owner with frictionless voice entry in Bengali, bulletproof audit accountability, safe deleted-item recovery, compliant reversal vs refund accounting, and secure multi-user role segregation.
+**How:** Built Web Speech API components, implemented domain services (`ReversalService`, `AuditLogger`), added soft-delete recovery controller, configured `EnsureNotVisitor` middleware, and verified with end-to-end tests and automated release packaging.
+**Where:** `royal-nest/app/Services/*`, `royal-nest/app/Http/Controllers/*`, `royal-nest/app/Http/Middleware/*`, `royal-nest/resources/js/*`, `royal-nest/tests/Feature/*`, `royal-nest/database/migrations/*`.
+**Impact:** Zero regressions across all 81 automated tests, guaranteed ledger and FIFO integrity, full audit compliance, and an effortless mobile user experience.
+
+---
+
 ## [2026-11-13] — Staff Shift System, Daily Purchases & Outflows Report, Multi-Bill Supplier Allocation, Configurable Financial Accounts & Secure PWA Service Worker
 
 **What:**

@@ -294,4 +294,22 @@ class EmployeeController extends Controller
 
         return redirect()->back()->with('success', 'Salary payout recorded successfully.');
     }
+
+    /**
+     * Soft delete an employee to Recycle Bin.
+     */
+    public function destroy(Employee $employee): RedirectResponse
+    {
+        $name = $employee->name;
+        $employee->delete();
+
+        \App\Services\AuditLogger::log(
+            action: 'deleted',
+            description: "Soft deleted staff member '{$name}' to Recycle Bin",
+            entity: $employee,
+            module: 'recycle_bin'
+        );
+
+        return redirect()->back()->with('success', "Staff member '{$name}' moved to Recycle Bin.");
+    }
 }

@@ -16,6 +16,22 @@ const activeAccounts = computed(() => props.accounts.filter(a => a.is_active));
 
 const showTransferModal = ref(false);
 const showAdjustModal = ref(false);
+const showCreateModal = ref(false);
+
+const createForm = useForm({
+    name: '',
+    type: 'cash',
+    opening_balance: 0,
+});
+
+const submitCreate = () => {
+    createForm.post('/accounts', {
+        onSuccess: () => {
+            showCreateModal.value = false;
+            createForm.reset();
+        }
+    });
+};
 
 const toggleStatus = (account) => {
     router.post(`/accounts/${account.id}/toggle-status`, {}, {
@@ -77,10 +93,18 @@ const submitAdjust = () => {
                 </p>
             </div>
 
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2">
+                <button 
+                    @click="showCreateModal = true"
+                    class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition cursor-pointer min-h-[40px]"
+                >
+                    <PlusCircle class="w-4 h-4" />
+                    <span>নতুন একাউন্ট যোগ করুন</span>
+                </button>
+
                 <button 
                     @click="openAdjust"
-                    class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition cursor-pointer"
+                    class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition cursor-pointer min-h-[40px]"
                 >
                     <PlusCircle class="w-4 h-4 text-emerald-400" />
                     <span>{{ t('adjust_balance', 'Deposit / Withdrawal') }}</span>
@@ -88,7 +112,7 @@ const submitAdjust = () => {
 
                 <button 
                     @click="openTransfer"
-                    class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer"
+                    class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer min-h-[40px]"
                 >
                     <ArrowLeftRight class="w-4 h-4" />
                     <span>{{ t('transfer_funds', 'Transfer Funds') }}</span>
@@ -356,6 +380,68 @@ const submitAdjust = () => {
                             class="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold px-4 py-2 rounded-xl transition cursor-pointer"
                         >
                             Confirm Adjustment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Create Account Modal -->
+        <div v-if="showCreateModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+                <h2 class="text-base font-bold text-white mb-4">নতুন আর্থিক একাউন্ট যোগ করুন</h2>
+
+                <form @submit.prevent="submitCreate" class="space-y-4 text-xs">
+                    <div>
+                        <label class="block text-slate-300 font-medium mb-1">একাউন্টের নাম *</label>
+                        <input 
+                            type="text" 
+                            v-model="createForm.name" 
+                            required
+                            placeholder="যেমন: সিটি ব্যাংক কারেন্ট বা বিকাশ মার্চেন্ট ২"
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-300 font-medium mb-1">একাউন্টের ধরণ (Type) *</label>
+                        <select 
+                            v-model="createForm.type" 
+                            required
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                        >
+                            <option value="cash">নগদ ক্যাশ (Cash Drawer / Float)</option>
+                            <option value="bank">ব্যাংক একাউন্ট (Bank Account)</option>
+                            <option value="bkash">বিকাশ (bKash Wallet)</option>
+                            <option value="nagad">নগদ (Nagad Wallet)</option>
+                            <option value="other">অন্যান্য (Other)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-300 font-medium mb-1">প্রারম্ভিক ব্যালেন্স (Opening Balance ৳)</label>
+                        <input 
+                            type="number" 
+                            step="any"
+                            v-model="createForm.opening_balance" 
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                        />
+                    </div>
+
+                    <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-800">
+                        <button 
+                            type="button" 
+                            @click="showCreateModal = false"
+                            class="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition cursor-pointer"
+                        >
+                            বাতিল
+                        </button>
+                        <button 
+                            type="submit" 
+                            :disabled="createForm.processing"
+                            class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-xl transition cursor-pointer shadow-lg"
+                        >
+                            একাউন্ট সংরক্ষণ করুন
                         </button>
                     </div>
                 </form>

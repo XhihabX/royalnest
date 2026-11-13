@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue';
-import { Head, Link, useForm, router } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
 import { 
     Users, 
@@ -27,6 +27,8 @@ const props = defineProps({
 });
 
 const { t } = useI18n();
+const page = usePage();
+const isVisitor = computed(() => Boolean(page.props.auth?.user?.is_visitor));
 
 const activeTab = ref('salary'); // 'salary', 'attendance', 'advances'
 const selectedMonth = ref(props.month);
@@ -140,8 +142,8 @@ const submitAdvance = () => {
                                 <span class="text-amber-400 font-medium">নিরাপত্তা জামানত: {{ profile.held_salary_days }} দিন (৳{{ profile.held_salary_deposit }})</span>
                             </span>
                             <span>•</span>
-                            <span>Phone: {{ profile.employee.phone }}</span>
-                            <span v-if="profile.employee.nid_photo_url">
+                            <span>Phone: {{ isVisitor ? profile.employee.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') : profile.employee.phone }}</span>
+                            <span v-if="profile.employee.nid_photo_url && !isVisitor">
                                 • 
                                 <button
                                     type="button"
@@ -156,7 +158,7 @@ const submitAdvance = () => {
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div v-if="!isVisitor" class="flex items-center gap-2">
                     <button
                         type="button"
                         @click="showPaySalaryModal = true"
@@ -174,6 +176,9 @@ const submitAdvance = () => {
                         <Send class="w-4 h-4 text-amber-400" />
                         <span>Issue Advance</span>
                     </button>
+                </div>
+                <div v-else class="px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-800 text-purple-300 text-xs font-bold">
+                    ভিউ-অনলি মোড (View-Only)
                 </div>
             </div>
 

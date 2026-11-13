@@ -247,4 +247,22 @@ class SupplierController extends Controller
 
         return redirect()->back()->with('success', "Supplier advance voucher #{$advance->voucher_no} recorded.");
     }
+
+    /**
+     * Soft delete a supplier to Recycle Bin.
+     */
+    public function destroy(Supplier $supplier): RedirectResponse
+    {
+        $name = $supplier->company_name;
+        $supplier->delete();
+
+        \App\Services\AuditLogger::log(
+            action: 'deleted',
+            description: "Soft deleted supplier '{$name}' to Recycle Bin",
+            entity: $supplier,
+            module: 'recycle_bin'
+        );
+
+        return redirect()->back()->with('success', "Supplier '{$name}' moved to Recycle Bin.");
+    }
 }

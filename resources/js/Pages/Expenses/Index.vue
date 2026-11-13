@@ -1,9 +1,10 @@
 <script setup>
 import { ref } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Receipt, Plus } from 'lucide-vue-next';
+import { Receipt, Plus, Ban } from 'lucide-vue-next';
 import { useI18n } from '@/Composables/useI18n';
+import VoiceInputButton from '@/Components/Voice/VoiceInputButton.vue';
 
 const { t } = useI18n();
 
@@ -22,6 +23,22 @@ const form = useForm({
     payee: '',
     notes: '',
 });
+
+const handleVoiceApply = (parsed) => {
+    if (parsed.amount) form.amount = parsed.amount;
+    if (parsed.item_name) form.payee = parsed.item_name;
+    if (parsed.note) form.notes = parsed.note;
+    showModal.value = true;
+};
+
+const handleVoid = (expense) => {
+    const reason = prompt(`খরচ #${expense.id} (${expense.category}) বাতিল (Void) করার কারণ লিখুন:`);
+    if (reason && reason.trim()) {
+        router.post(`/expenses/${expense.id}/void`, {
+            reason: reason.trim(),
+        });
+    }
+};
 
 const openModal = () => {
     form.reset();
@@ -48,13 +65,22 @@ const submit = () => {
                 </p>
             </div>
 
-            <button 
-                @click="openModal"
-                class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer"
-            >
-                <Plus class="w-4 h-4" />
-                <span>{{ t('record_expense', 'Add Expense') }}</span>
-            </button>
+            <div class="flex items-center gap-2">
+                <VoiceInputButton
+                    context-type="expenses"
+                    title="খরচ ভয়েস টাইপিং"
+                    hint='যেমন: "বিদ্যুৎ বিল ১৫০০ টাকা ক্যাশ"'
+                    @apply="handleVoiceApply"
+                />
+
+                <button 
+                    @click="openModal"
+                    class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer min-h-[40px]"
+                >
+                    <Plus class="w-4 h-4" />
+                    <span>{{ t('record_expense', 'Add Expense') }}</span>
+                </button>
+            </div>
         </div>
 
         <!-- Expenses Table -->
@@ -69,6 +95,7 @@ const submit = () => {
                             <th class="py-3 px-4 text-right">Amount (৳)</th>
                             <th class="py-3 px-4">Paid From</th>
                             <th class="py-3 px-4">Notes</th>
+                            <th class="py-3 px-4 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/60">
@@ -85,6 +112,18 @@ const submit = () => {
                             </td>
                             <td class="py-3 px-4 text-slate-400">{{ e.payment_account?.name || 'Unlinked' }}</td>
                             <td class="py-3 px-4 text-slate-500 max-w-xs truncate">{{ e.notes || '-' }}</td>
+                            <td class="py-3 px-4 text-right">
+                                <button
+                                    v-if="e.reversal_status !== 'voided'"
+                                    type="button"
+                                    @click="handleVoid(e)"
+                                    class="px-2.5 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 text-[11px] font-bold transition inline-flex items-center gap-1"
+                                >
+                                    <Ban class="w-3 h-3" />
+                                    <span>Void</span>
+                                </button>
+                                <span v-else class="text-[10px] text-slate-500 italic">বাতিলকৃত</span>
+                            </td>
                         </tr>
                     </tbody>
                 </table>

@@ -18,11 +18,18 @@ class OperatingExpense extends Model
         'payee',
         'notes',
         'created_by',
+        'reversal_status',
+        'reversal_type',
+        'reversed_at',
+        'reversed_by',
+        'reversal_reason',
+        'compensating_transaction_id',
     ];
 
     protected $casts = [
         'expense_date' => 'date:Y-m-d',
         'amount' => 'decimal:2',
+        'reversed_at' => 'datetime',
     ];
 
     public function paymentAccount(): BelongsTo

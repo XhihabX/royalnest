@@ -19,6 +19,7 @@ class User extends Authenticatable
         'email',
         'phone',
         'primary_role',
+        'is_super_admin',
         'password',
         'security_pin',
         'is_active',
@@ -42,8 +43,38 @@ class User extends Authenticatable
             'password' => 'hashed',
             'security_pin' => 'hashed',
             'is_active' => 'boolean',
+            'is_super_admin' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return (bool) $this->is_super_admin;
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (User $user) {
+            if ($user->isSuperAdmin()) {
+                throw new \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException(
+                    'The Primary Super Admin account cannot be deleted.'
+                );
+            }
+        });
+
+        static::updating(function (User $user) {
+            if ($user->getOriginal('is_super_admin') && !$user->is_super_admin) {
+                throw new \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException(
+                    'The Super Admin identity privilege cannot be stripped.'
+                );
+            }
+            if ($user->getOriginal('is_super_admin') && !$user->is_active) {
+                throw new \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException(
+                    'The Primary Super Admin account cannot be deactivated.'
+                );
+            }
+        });
     }
 
     public function branch(): BelongsTo
@@ -56,15 +87,20 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class, 'user_roles');
     }
 
+    public function isVisitor(): bool
+    {
+        return $this->primary_role === 'visitor';
+    }
+
     public function hasRole(string|array $roles): bool
     {
         $roleList = is_array($roles) ? $roles : explode('|', $roles);
 
-        if (in_array($this->primary_role, ['owner', 'admin'])) {
+        if (in_array($this->primary_role, $roleList)) {
             return true;
         }
 
-        if (in_array($this->primary_role, $roleList)) {
+        if (in_array($this->primary_role, ['owner', 'admin']) && !in_array('visitor', $roleList)) {
             return true;
         }
 

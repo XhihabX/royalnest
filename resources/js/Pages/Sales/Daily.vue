@@ -1,9 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { ShoppingBag, AlertTriangle, CheckCircle2, Calendar } from 'lucide-vue-next';
+import { ShoppingBag, AlertTriangle, CheckCircle2, Calendar, Ban } from 'lucide-vue-next';
 import { useI18n } from '@/Composables/useI18n';
+import VoiceInputButton from '@/Components/Voice/VoiceInputButton.vue';
 
 const { t } = useI18n();
 
@@ -21,6 +22,23 @@ const form = useForm({
     other_sales: '',
     notes: '',
 });
+
+const handleVoiceApply = (parsed) => {
+    if (parsed.amount) {
+        form.total_sales = parsed.amount;
+        form.cash_sales = parsed.amount;
+    }
+    if (parsed.note) form.notes = parsed.note;
+};
+
+const handleVoid = (s) => {
+    const reason = prompt(`বিক্রয় তারিখ ${s.sales_date} এর এন্ট্রি বাতিল (Void) করার কারণ লিখুন:`);
+    if (reason && reason.trim()) {
+        router.post(`/sales/${s.id}/void`, {
+            reason: reason.trim(),
+        });
+    }
+};
 
 const paymentSum = computed(() => {
     const c = parseFloat(form.cash_sales) || 0;
@@ -50,9 +68,18 @@ const submit = () => {
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left 1 Col: Daily Sales Input Form -->
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                <div class="flex items-center space-x-2 mb-4">
-                    <ShoppingBag class="w-5 h-5 text-amber-400" />
-                    <h2 class="text-base font-bold text-white">{{ t('record_daily_sales', 'Record Daily Sales') }}</h2>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-2">
+                        <ShoppingBag class="w-5 h-5 text-amber-400" />
+                        <h2 class="text-base font-bold text-white">{{ t('record_daily_sales', 'Record Daily Sales') }}</h2>
+                    </div>
+
+                    <VoiceInputButton
+                        context-type="sales"
+                        title="বিক্রয় ভয়েস টাইপিং"
+                        hint='যেমন: "আজকে ক্যাশ বিক্রয় ৮৫০০ টাকা"'
+                        @apply="handleVoiceApply"
+                    />
                 </div>
                 <p class="text-xs text-slate-400 mb-5">
                     {{ t('daily_sales_desc', 'Manual end-of-day sales entry with automated payment method reconciliation (Cash, bKash, Nagad, Card).') }}
@@ -198,6 +225,7 @@ const submit = () => {
                                 <th class="pb-2.5 text-right">Nagad</th>
                                 <th class="pb-2.5 text-right">Card</th>
                                 <th class="pb-2.5 text-center">Reconciliation</th>
+                                <th class="pb-2.5 text-right">Action</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-800/60">
@@ -210,7 +238,13 @@ const submit = () => {
                                 <td class="py-3 text-right font-mono text-slate-300">৳{{ s.card_bank_sales }}</td>
                                 <td class="py-3 text-center">
                                     <span 
-                                        v-if="Number(s.discrepancy_amount) === 0"
+                                        v-if="s.reversal_status === 'voided'"
+                                        class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                    >
+                                        Voided
+                                    </span>
+                                    <span 
+                                        v-else-if="Number(s.discrepancy_amount) === 0"
                                         class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                                     >
                                         Reconciled
@@ -221,6 +255,18 @@ const submit = () => {
                                     >
                                         Discrepancy ৳{{ s.discrepancy_amount }}
                                     </span>
+                                </td>
+                                <td class="py-3 text-right">
+                                    <button
+                                        v-if="s.reversal_status !== 'voided'"
+                                        type="button"
+                                        @click="handleVoid(s)"
+                                        class="px-2.5 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 text-[11px] font-bold transition inline-flex items-center gap-1"
+                                    >
+                                        <Ban class="w-3 h-3" />
+                                        <span>Void</span>
+                                    </button>
+                                    <span v-else class="text-[10px] text-slate-500 italic">বাতিলকৃত</span>
                                 </td>
                             </tr>
                         </tbody>

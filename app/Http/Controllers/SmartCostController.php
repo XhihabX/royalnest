@@ -95,6 +95,61 @@ class SmartCostController extends Controller
             ->limit(10)
             ->get();
 
+        // Instant Daily Summary Calculation for the Selected Date
+        $activePurchases = Purchase::whereDate('purchase_date', $date)
+            ->where('reversal_status', '!=', 'voided')
+            ->with(['items.product'])
+            ->get();
+
+        $rawMaterialPurchases = 0;
+        $packagingPurchases = 0;
+        foreach ($activePurchases as $p) {
+            foreach ($p->items as $item) {
+                if ($item->product?->product_type === 'packaging') {
+                    $packagingPurchases += (float) ($item->line_total ?? ($item->quantity * $item->unit_price));
+                } else {
+                    $rawMaterialPurchases += (float) ($item->line_total ?? ($item->quantity * $item->unit_price));
+                }
+            }
+        }
+
+        $operatingExpenses = (float) OperatingExpense::whereDate('expense_date', $date)
+            ->where('reversal_status', '!=', 'voided')
+            ->sum('amount');
+
+        $supplierPayouts = (float) \App\Models\SupplierPayment::whereDate('payment_date', $date)
+            ->where('reversal_status', '!=', 'voided')
+            ->sum('amount');
+
+        $salaryPayouts = (float) \App\Models\SalaryPayment::whereDate('payment_date', $date)
+            ->where('reversal_status', '!=', 'voided')
+            ->sum('amount');
+
+        $advancePayouts = (float) \App\Models\EmployeeAdvance::whereDate('advance_date', $date)
+            ->where('reversal_status', '!=', 'voided')
+            ->sum('amount');
+
+        $dailySale = \App\Models\DailySale::whereDate('sales_date', $date)
+            ->where('reversal_status', '!=', 'voided')
+            ->first();
+
+        $dailyCogs = (float) \App\Models\Consumption::whereDate('consumption_date', $date)->sum('total_cost');
+
+        $dailySummary = [
+            'date' => $date,
+            'raw_material_purchases' => round($rawMaterialPurchases, 2),
+            'packaging_purchases' => round($packagingPurchases, 2),
+            'total_purchases' => round($rawMaterialPurchases + $packagingPurchases, 2),
+            'operating_expenses' => round($operatingExpenses, 2),
+            'supplier_payments' => round($supplierPayouts, 2),
+            'salary_payments' => round($salaryPayouts, 2),
+            'staff_advances' => round($advancePayouts, 2),
+            'total_liability_outflows' => round($supplierPayouts + $salaryPayouts + $advancePayouts, 2),
+            'gross_sales' => $dailySale ? (float) $dailySale->total_sales : 0.00,
+            'cash_sales' => $dailySale ? (float) $dailySale->cash_sales : 0.00,
+            'cogs' => round($dailyCogs, 2),
+        ];
+
         return Inertia::render('Costs/Index', [
             'templates' => $templates,
             'products' => $products,
@@ -104,6 +159,7 @@ class SmartCostController extends Controller
             'accounts' => $accounts,
             'recentPurchases' => $recentPurchases,
             'recentExpenses' => $recentExpenses,
+            'dailySummary' => $dailySummary,
             'selectedDate' => $date,
             'filters' => [
                 'search' => $search ?? '',

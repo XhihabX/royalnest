@@ -1,9 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Truck, Plus, CheckCircle, Trash2, Zap, AlertCircle } from 'lucide-vue-next';
+import { Truck, Plus, CheckCircle, Trash2, Zap, AlertCircle, Ban } from 'lucide-vue-next';
 import { useI18n } from '@/Composables/useI18n';
+import VoiceInputButton from '@/Components/Voice/VoiceInputButton.vue';
 
 const { t } = useI18n();
 
@@ -28,6 +29,32 @@ const form = useForm({
         { product_id: '', purchase_quantity: 1, purchase_unit: '', unit_price: 0 }
     ],
 });
+
+const handleVoiceApply = (parsed) => {
+    if (parsed.supplier_id) form.supplier_id = parsed.supplier_id;
+    if (parsed.amount) form.paid_amount = parsed.amount;
+    if (parsed.note) form.notes = parsed.note;
+
+    if (parsed.product_id) {
+        form.items[0].product_id = parsed.product_id;
+        form.items[0].purchase_quantity = parsed.quantity || 1;
+        form.items[0].purchase_unit = parsed.unit || 'kg';
+        if (parsed.amount && parsed.quantity) {
+            form.items[0].unit_price = Number((parsed.amount / parsed.quantity).toFixed(2));
+        }
+    }
+    showModal.value = true;
+};
+
+const handleVoid = (p) => {
+    const reason = prompt(`ইনভয়েস #${p.invoice_no || p.id} বাতিল (Void) করার কারণ লিখুন:`);
+    if (reason && reason.trim()) {
+        router.post(`/purchases/${p.id}/void`, {
+            reason: reason.trim(),
+            allow_partial_return: true,
+        });
+    }
+};
 
 const onProductSelect = (index) => {
     const pId = form.items[index].product_id;
@@ -83,13 +110,22 @@ const submit = () => {
                 </p>
             </div>
 
-            <button 
-                @click="openModal"
-                class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer"
-            >
-                <Plus class="w-4 h-4" />
-                <span>{{ t('record_purchase', 'Record Stock Receipt') }}</span>
-            </button>
+            <div class="flex items-center gap-2">
+                <VoiceInputButton
+                    context-type="purchases"
+                    title="ক্রয় ভয়েস টাইপিং"
+                    hint='যেমন: "আলু ১০ কেজি প্রতি কেজি ৫০ টাকা ক্যাশ"'
+                    @apply="handleVoiceApply"
+                />
+
+                <button 
+                    @click="openModal"
+                    class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer min-h-[40px]"
+                >
+                    <Plus class="w-4 h-4" />
+                    <span>{{ t('record_purchase', 'Record Stock Receipt') }}</span>
+                </button>
+            </div>
         </div>
 
         <!-- Purchases Table -->
@@ -106,6 +142,7 @@ const submit = () => {
                             <th class="py-3 px-4 text-right">Paid (৳)</th>
                             <th class="py-3 px-4 text-center">Workflow</th>
                             <th class="py-3 px-4 text-center">Status</th>
+                            <th class="py-3 px-4 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/60">
@@ -131,9 +168,25 @@ const submit = () => {
                                 <span v-else class="text-slate-400 text-[11px]">Standard Receipt</span>
                             </td>
                             <td class="py-3 px-4 text-center">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                    {{ p.status }}
+                                <span 
+                                    class="px-2 py-0.5 rounded text-[10px] font-bold"
+                                    :class="p.reversal_status === 'voided' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'"
+                                >
+                                    {{ p.reversal_status === 'voided' ? 'Voided' : p.status }}
                                 </span>
+                            </td>
+                            <td class="py-3 px-4 text-right">
+                                <button
+                                    v-if="p.reversal_status !== 'voided'"
+                                    type="button"
+                                    @click="handleVoid(p)"
+                                    class="px-2.5 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 text-[11px] font-bold transition inline-flex items-center gap-1"
+                                    title="ভুল এন্ট্রি বাতিল করুন"
+                                >
+                                    <Ban class="w-3 h-3" />
+                                    <span>Void</span>
+                                </button>
+                                <span v-else class="text-[10px] text-slate-500 italic">বাতিলকৃত</span>
                             </td>
                         </tr>
                     </tbody>
