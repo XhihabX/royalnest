@@ -88,6 +88,7 @@ const combinedItems = computed(() => {
         amount: p.line_total,
         details: `${p.quantity} ${p.unit} @ ৳${p.unit_price}`,
         isPnlExpense: false,
+        reversalStatus: p.reversal_status || 'active',
     }));
 
     const oItems = props.allOutflows.map(o => ({
@@ -101,6 +102,7 @@ const combinedItems = computed(() => {
         amount: o.amount,
         details: o.notes || (o.allocations?.length ? `${o.allocations.length} bills settled` : ''),
         isPnlExpense: o.is_pnl_expense,
+        reversalStatus: o.reversal_status || 'active',
     }));
 
     let combined = [...pItems, ...oItems].sort((a, b) => b.date.localeCompare(a.date));
@@ -393,7 +395,10 @@ const combinedItems = computed(() => {
                                 <td class="p-3 text-right text-slate-400">৳{{ p.unit_price }}</td>
                                 <td class="p-3 text-right font-bold text-amber-400 text-sm">৳{{ p.line_total.toLocaleString() }}</td>
                                 <td class="p-3 text-center">
-                                    <span :class="[
+                                    <span v-if="p.reversal_status === 'voided'" class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-rose-950/80 text-rose-300 border border-rose-800">
+                                        বাতিল / Voided
+                                    </span>
+                                    <span v-else :class="[
                                         'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
                                         p.payment_status === 'paid' ? 'bg-emerald-500/15 text-emerald-400' :
                                         p.payment_status === 'partial' ? 'bg-amber-500/15 text-amber-400' :
@@ -413,13 +418,19 @@ const combinedItems = computed(() => {
                         v-for="(p, idx) in filteredPurchases"
                         :key="idx"
                         class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2 shadow-sm"
+                        :class="p.reversal_status === 'voided' ? 'opacity-70 border-rose-900/40' : ''"
                     >
                         <div class="flex items-start justify-between">
                             <div>
-                                <span class="font-bold text-white text-sm block">{{ p.item_name }}</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-bold text-white text-sm block">{{ p.item_name }}</span>
+                                    <span v-if="p.reversal_status === 'voided'" class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-rose-950 text-rose-300 border border-rose-800">
+                                        বাতিল
+                                    </span>
+                                </div>
                                 <span class="text-xs text-slate-400">{{ p.supplier_name }} • <span class="font-mono">#{{ p.invoice_no }}</span></span>
                             </div>
-                            <span class="text-sm font-bold text-amber-400">৳{{ p.line_total.toLocaleString() }}</span>
+                            <span class="text-sm font-bold" :class="p.reversal_status === 'voided' ? 'text-slate-500 line-through' : 'text-amber-400'">৳{{ p.line_total.toLocaleString() }}</span>
                         </div>
                         <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-800/80">
                             <span :class="[
@@ -485,7 +496,10 @@ const combinedItems = computed(() => {
                                     ৳{{ o.amount.toLocaleString() }}
                                 </td>
                                 <td class="p-3">
-                                    <span v-if="o.is_pnl_expense" class="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded">
+                                    <span v-if="o.reversal_status === 'voided'" class="text-[10px] text-rose-300 font-bold bg-rose-950/80 border border-rose-800 px-2 py-0.5 rounded">
+                                        বাতিল / Voided
+                                    </span>
+                                    <span v-else-if="o.is_pnl_expense" class="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded">
                                         Direct P&L Expense
                                     </span>
                                     <span v-else class="text-[10px] text-slate-400 font-medium bg-slate-800 px-2 py-0.5 rounded">
@@ -503,13 +517,19 @@ const combinedItems = computed(() => {
                         v-for="o in filteredOutflows"
                         :key="o.id"
                         class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2 shadow-sm"
+                        :class="o.reversal_status === 'voided' ? 'opacity-70 border-rose-900/40' : ''"
                     >
                         <div class="flex items-start justify-between">
                             <div>
-                                <span class="font-bold text-white text-sm block">{{ o.name }}</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-bold text-white text-sm block">{{ o.name }}</span>
+                                    <span v-if="o.reversal_status === 'voided'" class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-rose-950 text-rose-300 border border-rose-800">
+                                        বাতিল
+                                    </span>
+                                </div>
                                 <span class="text-xs text-slate-400">{{ o.date }} • {{ o.account_name }}</span>
                             </div>
-                            <span class="text-sm font-bold" :class="o.is_pnl_expense ? 'text-amber-400' : 'text-slate-100'">
+                            <span class="text-sm font-bold" :class="o.reversal_status === 'voided' ? 'text-slate-500 line-through' : (o.is_pnl_expense ? 'text-amber-400' : 'text-slate-100')">
                                 ৳{{ o.amount.toLocaleString() }}
                             </span>
                         </div>
@@ -523,7 +543,8 @@ const combinedItems = computed(() => {
                             ]">
                                 {{ o.type_label }}
                             </span>
-                            <span v-if="o.is_pnl_expense" class="text-[10px] text-emerald-400 font-semibold">P&L Expense</span>
+                            <span v-if="o.reversal_status === 'voided'" class="text-[10px] text-rose-400 font-bold">বাতিলকৃত (Voided)</span>
+                            <span v-else-if="o.is_pnl_expense" class="text-[10px] text-emerald-400 font-semibold">P&L Expense</span>
                             <span v-else class="text-[10px] text-slate-400">Balance Sheet</span>
                         </div>
                     </div>
@@ -537,11 +558,15 @@ const combinedItems = computed(() => {
                         v-for="item in combinedItems"
                         :key="item.id"
                         class="p-3 sm:p-4 hover:bg-slate-800/40 transition flex items-center justify-between gap-3"
+                        :class="item.reversalStatus === 'voided' ? 'opacity-60 bg-rose-950/10' : ''"
                     >
                         <div class="space-y-0.5">
                             <div class="flex items-center gap-2">
                                 <span class="font-bold text-white text-xs sm:text-sm">{{ item.title }}</span>
-                                <span :class="[
+                                <span v-if="item.reversalStatus === 'voided'" class="px-2 py-0.2 rounded text-[10px] font-bold uppercase bg-rose-950 text-rose-300 border border-rose-800">
+                                    বাতিল / Voided
+                                </span>
+                                <span v-else :class="[
                                     'px-2 py-0.2 rounded text-[10px] font-semibold',
                                     item.kind === 'purchase' ? 'bg-emerald-500/15 text-emerald-400' :
                                     item.kind === 'operating_expense' ? 'bg-amber-500/15 text-amber-400' :
@@ -557,7 +582,9 @@ const combinedItems = computed(() => {
                             </div>
                         </div>
                         <div class="text-right">
-                            <span class="text-xs sm:text-sm font-bold text-amber-400">৳{{ item.amount.toLocaleString() }}</span>
+                            <span class="text-xs sm:text-sm font-bold" :class="item.reversalStatus === 'voided' ? 'text-slate-500 line-through' : 'text-amber-400'">
+                                ৳{{ item.amount.toLocaleString() }}
+                            </span>
                         </div>
                     </div>
                 </div>

@@ -182,9 +182,10 @@ All routes render Vue 3 components via Inertia.js with Tailwind CSS v4:
 ---
 
 ## 6. Automated Verification Status
-- **Test Coverage**: 81 automated PHPUnit tests across 13 test suites passing 100% green, including `SystemWideEnhancementAndReadinessTest.php`, `ShiftAttendanceReportsAndAccountsTest.php`, `MobileCalculatorAndStaffHoldTest.php`, `SmartCostAndCashReconciliationTest.php`, `OneTimeEntryGlobalSynchronizationTest.php`, `SystemLogicPerfectionTest.php`, and `PrdMandatoryScenariosTest.php`.
+- **Test Coverage**: 92 automated PHPUnit tests across 14 test suites passing 100% green, including `FinalProductionRefinementsTest.php`, `SystemWideEnhancementAndReadinessTest.php`, `ShiftAttendanceReportsAndAccountsTest.php`, `MobileCalculatorAndStaffHoldTest.php`, `SmartCostAndCashReconciliationTest.php`, `OneTimeEntryGlobalSynchronizationTest.php`, `SystemLogicPerfectionTest.php`, and `PrdMandatoryScenariosTest.php`.
 - **Supplier & Staff Verification**: Full verification of Directory vs Active separation, multi-bill allocation, due payment vouchers, cash drawer deductions, Employee ID auto-generation, shift alerts, held salary security deposit calculation, and advance recovery deductions.
 - **FIFO & Daily Calculator Verification**: Proves previous stock retains historical price, future purchases retain incoming price, and the Daily P&L Calculator atomically deducts FIFO batches while syncing daily sales.
 - **Audit, Recovery & Reversal Verification**: Verified tamper-proof immutable audit records, soft-delete restoration without dependency violations, separate accounting voids vs actual refunds, Super Admin lock, and Visitor read-only 403 enforcement.
-- **Frontend Compiler**: Vite 8 compiling all production bundles with zero errors in 5.51 seconds.
+- **Production Refinement Verification**: Verified Bangladesh Standard Timezone (`Asia/Dhaka`), zero contamination of P&L reports by voided transactions while preserving legacy records with `reversal_status = NULL`, and audit visibility of cancelled transactions in `/reports/transactions` with clean exclusion from active cash outflow totals.
+- **Frontend Compiler**: Vite 8 compiling all production bundles with zero errors in 5.70 seconds.
 - **Production Packager**: `package_production.py` generates self-contained deployment ZIP in `dist/`.

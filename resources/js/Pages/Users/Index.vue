@@ -284,3 +284,4 @@ const handleDeleteUser = (user) => {
         </div>
     </AppLayout>
 </template>
+

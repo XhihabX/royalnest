@@ -305,3 +305,4 @@ const viewDiff = (log) => {
         </div>
     </AppLayout>
 </template>
+

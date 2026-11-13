@@ -309,3 +309,4 @@ const handlePurge = (type, id, name) => {
         </div>
     </AppLayout>
 </template>
+

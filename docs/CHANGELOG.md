@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-13] — Production Refinements: Bangladesh Timezone, Voided P&L Exclusion & Outflow Report Void Flags
+
+**What:**
+1. **Bangladesh Standard Timezone Configuration** (`config/app.php`, `.env`, `.env.production.example`):
+   - Configured `'timezone' => env('APP_TIMEZONE', 'Asia/Dhaka')` ensuring runtime timestamps and business dates match local restaurant hours in Bangladesh (UTC+6).
+   - Verified that late-evening and midnight restaurant transactions (`23:45` to `00:15`) are cleanly recognized and properly partitioned across business dates without shifting or distorting historical records.
+2. **P&L Service Voided Transaction Exclusion** (`app/Services/ProfitLossService.php`):
+   - Added explicit filtering `->where(fn ($q) => $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided'))` across `DailySale` and `OperatingExpense` queries in both single-day (`getDailySummary`) and date-range (`getRangeSummary`) calculators.
+   - Guaranteed that cancelled/voided mistaken entries never artificially inflate Gross Sales, Operating Costs, or Net Operating Profit.
+   - Preserved backward compatibility for pre-enhancement legacy records where `reversal_status` is `NULL`.
+3. **Daily Transactions Report Void Flagging & Real Money Totals** (`app/Http/Controllers/ReportController.php`, `resources/js/Pages/Reports/Transactions.vue`):
+   - Passed `reversal_status` across all transaction lines: Purchases, Operating Expenses, Supplier Payments, Staff Salary Payouts, and Staff Advances.
+   - Filtered active summary metrics (`total_purchases`, `total_raw_materials`, `total_packaging`, `total_operating_expenses`, `total_supplier_payments`, `total_salary_payments`, `total_advances_issued`, and `total_cash_outflows`) to calculate ONLY active non-voided transactions so report totals strictly reflect genuine money movements.
+   - Preserved voided vouchers in all 3 tabs (Purchases, Expenses & Outflows, and Combined Stream) rendered with a prominent `[বাতিল / Voided]` badge, strikethrough styling, and dimmed opacity for complete audit visibility.
+4. **Automated Verification Suite** (`tests/Feature/FinalProductionRefinementsTest.php`):
+   - Created 11 targeted regression tests covering active vs voided sales in P&L, legacy NULL compatibility, active vs voided expenses, voided purchase exclusion from spend totals, voided supplier/salary payouts, audit visibility of voided vouchers, physical refunds vs voids, Bangladesh midnight timezone partitioning, and unchanged FIFO inventory costing.
+   - Full test suite: **92/92 tests (482 assertions) passing 100% green**.
+   - Frontend compiled cleanly with Vite 8 (5.70s, 0 errors).
+   - Packaged updated production deployment zip: `dist/royal_nest_production_deployment.zip` (240 files, 0.59 MB).
+
+**Why:** Ensure 100% accounting fidelity so that cancelled mistaken transactions never distort financial profit or expense reports, while aligning operational dates with Bangladesh restaurant business hours.
+**How:** Configured `config/app.php`, updated `ProfitLossService` and `ReportController` Eloquent queries, updated `Transactions.vue` badges, and verified with 11 comprehensive automated tests.
+**Where:** `royal-nest/config/app.php`, `royal-nest/app/Services/ProfitLossService.php`, `royal-nest/app/Http/Controllers/ReportController.php`, `royal-nest/resources/js/Pages/Reports/Transactions.vue`, `royal-nest/tests/Feature/FinalProductionRefinementsTest.php`.
+**Impact:** Zero regressions across all 92 tests, complete audit trail preservation, accurate P&L margins, and correct local business-day reconciliation.
+
+---
+
 ## [2026-11-13] — Universal Voice Typing, Immutable Audit Trail, Recycle Bin Recovery, Reversal vs Refund Accounting, Super Admin Shield & Visitor Mode
 
 **What:**

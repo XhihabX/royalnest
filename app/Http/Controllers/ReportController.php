@@ -74,16 +74,17 @@ class ReportController extends Controller
                     'date' => $p->purchase_date->toDateString(),
                     'supplier_name' => $p->supplier?->name ?? 'Direct Purchase',
                     'item_name' => $item->product?->name ?? 'Custom Item',
-                    'quantity' => (float) $item->quantity,
-                    'unit' => $item->unit,
+                    'quantity' => (float) ($item->purchase_quantity ?? $item->quantity ?? 0),
+                    'unit' => $item->purchase_unit ?? $item->unit ?? 'pcs',
                     'unit_price' => (float) $item->unit_price,
-                    'line_total' => (float) $item->total_price,
+                    'line_total' => (float) ($item->subtotal ?? $item->total_price ?? 0),
                     'bill_total' => (float) $p->total_amount,
                     'paid_amount' => (float) $p->paid_amount,
                     'due_amount' => (float) $p->due_amount,
                     'category_type' => $catType,
                     'category_name' => $catName,
                     'payment_status' => $p->payment_status,
+                    'reversal_status' => $p->reversal_status ?? 'active',
                 ];
             }
         }
@@ -100,12 +101,13 @@ class ReportController extends Controller
                 'type_label' => 'Operating Expense',
                 'is_pnl_expense' => true,
                 'date' => $e->expense_date->toDateString(),
-                'name' => $e->name,
+                'name' => $e->payee ?: ucfirst($e->category).' Expense',
                 'category' => $e->category,
                 'amount' => (float) $e->amount,
                 'account_name' => $e->financialAccount?->name ?? 'Cash',
                 'notes' => $e->notes,
                 'creator' => $e->creator?->name,
+                'reversal_status' => $e->reversal_status ?? 'active',
             ]);
 
         // Supplier Payments (Balance Sheet / Due Settlement - NOT P&L expense)
@@ -130,11 +132,12 @@ class ReportController extends Controller
                     'allocated_amount' => (float) $a->allocated_amount,
                 ]),
                 'creator' => $sp->creator?->name,
+                'reversal_status' => $sp->reversal_status ?? 'active',
             ]);
 
         // Salary Payments (Payroll Liability Settlement - NOT double counted in P&L)
         $salaryPayments = SalaryPayment::whereBetween('payment_date', [$startDate, $endDate])
-            ->with(['employee', 'account', 'creator', 'deductions'])
+            ->with(['employee', 'account', 'creator'])
             ->orderBy('payment_date', 'desc')
             ->orderBy('id', 'desc')
             ->get()
@@ -150,6 +153,7 @@ class ReportController extends Controller
                 'account_name' => $sal->account?->name ?? 'Cash',
                 'notes' => "Month: {$sal->month_year}".($sal->notes ? " | {$sal->notes}" : ''),
                 'creator' => $sal->creator?->name,
+                'reversal_status' => $sal->reversal_status ?? 'active',
             ]);
 
         // Staff Advances (Asset / Receivable - NOT P&L expense)
@@ -170,6 +174,7 @@ class ReportController extends Controller
                 'account_name' => $adv->account?->name ?? 'Cash',
                 'notes' => $adv->reason,
                 'creator' => $adv->creator?->name,
+                'reversal_status' => $adv->reversal_status ?? 'active',
             ]);
 
         // Combine all outflows for Tab 2 & 3
@@ -178,16 +183,22 @@ class ReportController extends Controller
             ->values()
             ->all();
 
-        // Calculate Totals
-        $totalPurchases = round(collect($purchaseLines)->sum('line_total'), 2);
-        $totalRawMaterials = round(collect($purchaseLines)->where('category_type', 'raw_material')->sum('line_total'), 2);
-        $totalPackaging = round(collect($purchaseLines)->where('category_type', 'packaging')->sum('line_total'), 2);
-        $totalConsumables = round(collect($purchaseLines)->whereNotIn('category_type', ['raw_material', 'packaging'])->sum('line_total'), 2);
+        // Calculate Totals (strictly excluding voided records so active totals reflect real money movements)
+        $activePurchaseLines = collect($purchaseLines)->filter(fn ($p) => ($p['reversal_status'] ?? 'active') !== 'voided');
+        $activeExpenses = collect($expenses)->filter(fn ($e) => ($e['reversal_status'] ?? 'active') !== 'voided');
+        $activeSupplierPayments = collect($supplierPayments)->filter(fn ($sp) => ($sp['reversal_status'] ?? 'active') !== 'voided');
+        $activeSalaryPayments = collect($salaryPayments)->filter(fn ($sal) => ($sal['reversal_status'] ?? 'active') !== 'voided');
+        $activeAdvances = collect($advances)->filter(fn ($adv) => ($adv['reversal_status'] ?? 'active') !== 'voided');
 
-        $totalOperatingExpenses = round(collect($expenses)->sum('amount'), 2);
-        $totalSupplierPayments = round(collect($supplierPayments)->sum('amount'), 2);
-        $totalSalaryPayments = round(collect($salaryPayments)->sum('amount'), 2);
-        $totalAdvancesIssued = round(collect($advances)->sum('amount'), 2);
+        $totalPurchases = round($activePurchaseLines->sum('line_total'), 2);
+        $totalRawMaterials = round($activePurchaseLines->where('category_type', 'raw_material')->sum('line_total'), 2);
+        $totalPackaging = round($activePurchaseLines->where('category_type', 'packaging')->sum('line_total'), 2);
+        $totalConsumables = round($activePurchaseLines->whereNotIn('category_type', ['raw_material', 'packaging'])->sum('line_total'), 2);
+
+        $totalOperatingExpenses = round($activeExpenses->sum('amount'), 2);
+        $totalSupplierPayments = round($activeSupplierPayments->sum('amount'), 2);
+        $totalSalaryPayments = round($activeSalaryPayments->sum('amount'), 2);
+        $totalAdvancesIssued = round($activeAdvances->sum('amount'), 2);
         $totalCashOutflows = round($totalOperatingExpenses + $totalSupplierPayments + $totalSalaryPayments + $totalAdvancesIssued, 2);
 
         return Inertia::render('Reports/Transactions', [

@@ -202,3 +202,4 @@ class RecycleBinController extends Controller
         return back()->with('success', ucfirst($type) . ' permanently deleted.');
     }
 }
+

@@ -128,3 +128,4 @@ class TransactionReversalController extends Controller
         return back()->with('success', "Daily sales entry for {$sale->sales_date} successfully voided.");
     }
 }
+

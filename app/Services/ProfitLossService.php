@@ -25,8 +25,12 @@ class ProfitLossService
         $carbonDate = Carbon::parse($date);
         $daysInMonth = $carbonDate->daysInMonth;
 
-        // 1. Sales
-        $sale = DailySale::whereDate('sales_date', $date)->first();
+        // 1. Sales (excluding voided entries, preserving legacy NULL)
+        $sale = DailySale::whereDate('sales_date', $date)
+            ->where(function ($q) {
+                $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided');
+            })
+            ->first();
         $totalSales = $sale ? (float) $sale->total_sales : 0.00;
         $cashSales = $sale ? (float) $sale->cash_sales : 0.00;
         $bkashSales = $sale ? (float) $sale->bkash_sales : 0.00;
@@ -47,8 +51,12 @@ class ProfitLossService
         // Gross Profit
         $grossProfit = round($totalSales - $costOfMaterials, 2);
 
-        // 4. Operating Expenses
-        $operatingExpenses = (float) OperatingExpense::whereDate('expense_date', $date)->sum('amount');
+        // 4. Operating Expenses (excluding voided entries, preserving legacy NULL)
+        $operatingExpenses = (float) OperatingExpense::whereDate('expense_date', $date)
+            ->where(function ($q) {
+                $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided');
+            })
+            ->sum('amount');
 
         // 5. Wastage Cost
         $wastageCost = (float) Wastage::whereDate('wastage_date', $date)->sum('total_cost');
@@ -121,10 +129,18 @@ class ProfitLossService
     {
         $period = CarbonPeriod::create($startDate, $endDate);
 
-        $totalSales = (float) DailySale::whereBetween('sales_date', [$startDate, $endDate])->sum('total_sales');
+        $totalSales = (float) DailySale::whereBetween('sales_date', [$startDate, $endDate])
+            ->where(function ($q) {
+                $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided');
+            })
+            ->sum('total_sales');
         $consumptionCost = (float) Consumption::whereBetween('consumption_date', [$startDate, $endDate])->sum('total_cost');
         $consumableCost = $this->consumableAllocationService->getAllocatedCostForRange($startDate, $endDate);
-        $operatingExpenses = (float) OperatingExpense::whereBetween('expense_date', [$startDate, $endDate])->sum('amount');
+        $operatingExpenses = (float) OperatingExpense::whereBetween('expense_date', [$startDate, $endDate])
+            ->where(function ($q) {
+                $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided');
+            })
+            ->sum('amount');
         $wastageCost = (float) Wastage::whereBetween('wastage_date', [$startDate, $endDate])->sum('total_cost');
 
         // Sum daily salary accruals across the range

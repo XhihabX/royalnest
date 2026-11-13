@@ -54,3 +54,4 @@ const handleConfirmed = (parsedData) => {
         />
     </div>
 </template>
+
