@@ -57,7 +57,7 @@ return new class extends Migration
         foreach ($financialTables as $tableName) {
             if (Schema::hasTable($tableName)) {
                 Schema::table($tableName, function (Blueprint $table) {
-                    $table->string('reversal_status', 30)->default('active')->nullable()->index();
+                    $table->string('reversal_status', 30)->default('active')->index();
                     $table->string('reversal_type', 30)->nullable();
                     $table->timestamp('reversed_at')->nullable();
                     $table->unsignedBigInteger('reversed_by')->nullable()->index();

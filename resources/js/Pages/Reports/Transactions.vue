@@ -229,16 +229,16 @@ const combinedItems = computed(() => {
                     <p class="text-[10px] text-slate-400 mt-1">Payables Settlement</p>
                 </div>
 
-                <!-- Total Cash Outflow -->
+                <!-- Total Account Outflow -->
                 <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-sm">
                     <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
-                        <span>Total Cash Outflow</span>
+                        <span>Total Account Outflow</span>
                         <ArrowDownRight class="w-4 h-4 text-rose-400" />
                     </div>
-                    <p class="text-base sm:text-2xl font-bold text-rose-400 mt-1">৳{{ summary.total_cash_outflows?.toLocaleString() || 0 }}</p>
-                    <div class="text-[10px] text-slate-400 mt-1 flex gap-2">
-                        <span>Salary: ৳{{ summary.total_salary_payments?.toLocaleString() || 0 }}</span>
-                        <span>Adv: ৳{{ summary.total_advances_issued?.toLocaleString() || 0 }}</span>
+                    <p class="text-base sm:text-2xl font-bold text-rose-400 mt-1">৳{{ (summary.total_account_outflows ?? summary.total_cash_outflows ?? 0).toLocaleString() }}</p>
+                    <div class="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-x-2">
+                        <span class="text-rose-300">Cash: ৳{{ summary.actual_cash_outflows?.toLocaleString() || 0 }}</span>
+                        <span class="text-indigo-300">Bank/MFS: ৳{{ summary.digital_bank_outflows?.toLocaleString() || 0 }}</span>
                     </div>
                 </div>
             </div>

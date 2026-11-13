@@ -365,6 +365,10 @@ class FinalProductionRefinementsTest extends TestCase
         $summary = $response->viewData('page')['props']['summary'];
         $this->assertEquals(5000.00, $summary['total_supplier_payments']);
         $this->assertEquals(8000.00, $summary['total_salary_payments']);
+        $this->assertEquals(13000.00, $summary['total_liability_settlements']);
+        $this->assertEquals(13000.00, $summary['total_account_outflows']);
+        $this->assertEquals(13000.00, $summary['actual_cash_outflows']);
+        $this->assertEquals(0.00, $summary['digital_bank_outflows']);
         $this->assertEquals(13000.00, $summary['total_cash_outflows']);
     }
 
