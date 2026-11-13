@@ -151,7 +151,8 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
   - Voids mistaken supplier payments, salary payouts, advances, operating expenses, and daily sales by neutralizing fictitious ledger effects and restoring linked balances.
 - `SupplierService::getSupplierStatement`:
   - Dynamically renders purchase bills, credit notes (`type = 'credit_note'`, net effect: $-V_{\text{ret}}$), payment vouchers, advance vouchers, and supplier refund vouchers (`type = 'refund_voucher'`, net effect: $+R$).
-  - Guarantees that cumulative running due matches the live `$supplier->current_balance` at every single line.
+  - **Dynamic Credit Settlement Pool**: Integrates credit notes from returned paid purchases (`returnCreditNotes`) into the FIFO bill settlement pool (`allCreditsPool`), automatically reducing the `remaining_bill_due` of subsequent purchase invoices.
+  - Guarantees that the sum of invoice-level remaining dues, live `$supplier->current_balance`, and statement cumulative running due match each other to the exact penny across every single line.
 - `ReportController` & Outflow Classification:
   - Explicitly separates **Total Account Outflows** into:
     - **Actual Physical Cash Outflows** (`actual_cash_outflows`): Outflows strictly tied to accounts of type `cash` (Cash Drawer).

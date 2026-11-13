@@ -423,8 +423,26 @@ class SupplierService
         $allPaymentsTotal = (float) SupplierPayment::where('supplier_id', $supplier->id)->sum('amount')
             + (float) SupplierAdvance::where('supplier_id', $supplier->id)->sum('amount');
 
-        // Unallocated payments pool (general due payments + advances)
-        $paymentPool = max(0, round($allPaymentsTotal - $totalExplicitAllocated, 2));
+        // Include available credit notes originating from returned paid purchases
+        $returnCreditNotes = (float) Purchase::where('supplier_id', $supplier->id)
+            ->where('reversal_status', 'voided')
+            ->where('paid_amount', '>', 0)
+            ->get()
+            ->sum(function ($vp) {
+                $returnVal = (float) (StockLedger::where('reference_type', 'PurchaseVoid')
+                    ->where('reference_id', $vp->id)
+                    ->selectRaw('SUM(quantity_out * unit_cost) as val')
+                    ->value('val') ?? $vp->total_amount);
+                return min((float) $vp->paid_amount, $returnVal);
+            });
+
+        // Deduct actual cash/bank refunds already received from supplier
+        $refundsPaidTotal = (float) AccountTransaction::where('reference_type', 'SupplierRefund')
+            ->where('reference_id', $supplier->id)
+            ->sum('amount');
+
+        // Unallocated settlement pool (general payments + advances + return credit notes - refunds received)
+        $paymentPool = max(0, round($allPaymentsTotal + $returnCreditNotes - $refundsPaidTotal - $totalExplicitAllocated, 2));
 
         $openingBalance = (float) $supplier->opening_balance;
 

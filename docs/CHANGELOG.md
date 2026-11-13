@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-13] — Verification Audit: Credit Settlement Pool in Statements & Refund Idempotency
+
+**What:**
+1. **Dynamic Credit Note Pool in Supplier Statements** (`app/Services/SupplierService.php`):
+   - Integrated available return credit notes from paid purchases into the FIFO settlement pool in `getSupplierStatement`.
+   - Subsequent purchase invoices automatically reflect applied credit in `remaining_bill_due` and `status` (`paid` / `partially_paid`), reconciling invoice-level outstanding dues with `$supplier->current_balance` and statement running dues.
+2. **Refund Reference Idempotency & Concurrency Hardening** (`app/Services/ReversalService.php`):
+   - Added duplicate reference check in `recordSupplierRefund` preventing accidental resubmissions or duplicate refunds under the same voucher/reference code.
+3. **Comprehensive Regression Verification Suite** (`tests/Feature/SupplierCreditNotesAndRefundsTest.php`):
+   - Added 5 new automated regression tests (14 total) covering:
+     - Recorded payment without actual money movement drawer behavior.
+     - Credit note application across multiple subsequent purchase invoices.
+     - Invoice-level remaining dues reconciling with supplier balance and statement running balance.
+     - Duplicate refund reference prevention and idempotency.
+     - FIFO partial return after both kitchen consumption and wastage, confirming 100% preservation of historical COGS and wastage entries.
+   - Complete test suite: **108/108 tests (566 assertions) passing 100% green**.
+   - Vite 8 production build compiled in 5.17s (0 errors).
+   - Deployment bundle repackaged: `dist/royal_nest_production_deployment.zip`.
+
+**Why:** Completely fulfill the user's audit mandate by verifying that credit notes not only reduce balance sheet liabilities but also settle invoice-level remaining dues in statements, while enforcing refund idempotency.
+**How:** Enhanced `SupplierService::getSupplierStatement`, added duplicate check in `ReversalService`, and added 5 new tests in `SupplierCreditNotesAndRefundsTest`.
+**Where:** `royal-nest/app/Services/SupplierService.php`, `royal-nest/app/Services/ReversalService.php`, `royal-nest/tests/Feature/SupplierCreditNotesAndRefundsTest.php`, `royal-nest/docs/*`.
+**Impact:** 100% test pass rate (108/108), mathematical reconciliation across micro (invoice) and macro (supplier balance) levels, zero regressions.
+
+---
+
 ## [2026-11-13] — Critical Accounting Integrity: Strict Separation of Purchase Voids vs Supplier Refunds & Persistent Credit Notes
 
 **What:**

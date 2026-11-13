@@ -281,6 +281,17 @@ class ReversalService
                 ]);
             }
 
+            // Prevent duplicate refund with the exact same reference
+            $duplicate = \App\Models\AccountTransaction::where('reference_type', 'SupplierRefund')
+                ->where('reference_id', $lockedSupplier->id)
+                ->where('notes', 'like', "%(Ref: {$reference})%")
+                ->exists();
+            if ($duplicate) {
+                throw ValidationException::withMessages([
+                    'reference' => "A supplier refund with reference '{$reference}' has already been recorded for this supplier.",
+                ]);
+            }
+
             // Physical money received: deposit into financial account
             $this->accountService->deposit(
                 accountId: $account->id,
