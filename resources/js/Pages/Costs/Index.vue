@@ -200,6 +200,33 @@ const onProductSelect = () => {
     }
 };
 
+const onEmployeeSelect = () => {
+    const emp = props.employees.find(e => e.id === form.employee_id);
+    if (emp) {
+        form.name = emp.name;
+        if (form.transaction_type === 'salary_payment') {
+            if (emp.salary_type === 'daily') {
+                form.amount = Number(emp.agreed_salary);
+                form.paid_amount = Number(emp.agreed_salary);
+            } else if (emp.salary_type === 'monthly') {
+                const dailyRate = Number((Number(emp.agreed_salary) / 30).toFixed(2));
+                form.amount = dailyRate;
+                form.paid_amount = dailyRate;
+            }
+        }
+        // Default to cash drawer account
+        const cashAcc = props.accounts.find(a => a.type === 'cash') || props.accounts[0];
+        if (cashAcc) form.payment_account_id = cashAcc.id;
+    }
+};
+
+const quickWorkerPayout = (type) => {
+    activeTab.value = type;
+    form.transaction_type = type;
+    const cashAcc = props.accounts.find(a => a.type === 'cash') || props.accounts[0];
+    if (cashAcc) form.payment_account_id = cashAcc.id;
+};
+
 const submit = () => {
     form.post('/daily-costs', {
         onSuccess: () => {
@@ -405,6 +432,27 @@ const toggleFav = (tplId) => {
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left 2 Cols: Main Fast Entry Form -->
             <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <!-- 1-Tap Fast Worker Payout Buttons -->
+                <div class="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-none">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">⚡ দ্রুত কর্মী পেমেন্ট:</span>
+                    <button
+                        type="button"
+                        @click="quickWorkerPayout('salary_payment')"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition shrink-0 active:scale-95 cursor-pointer"
+                    >
+                        <Users class="w-3.5 h-3.5" />
+                        <span>দৈনিক মজুরি প্রদান (Daily Wage)</span>
+                    </button>
+                    <button
+                        type="button"
+                        @click="quickWorkerPayout('salary_advance')"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold transition shrink-0 active:scale-95 cursor-pointer"
+                    >
+                        <Wallet class="w-3.5 h-3.5" />
+                        <span>নগদ অগ্রিম প্রদান (Staff Advance)</span>
+                    </button>
+                </div>
+
                 <!-- Transaction Type Tabs -->
                 <div class="flex items-center gap-1.5 overflow-x-auto pb-3 mb-5 border-b border-slate-800/80 scrollbar-none">
                     <button
@@ -514,12 +562,13 @@ const toggleFav = (tplId) => {
                             <label class="block text-slate-300 font-medium mb-1">{{ t('staff_name', 'Select Staff / Employee') }}</label>
                             <select 
                                 v-model="form.employee_id" 
+                                @change="onEmployeeSelect"
                                 required
                                 class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                             >
                                 <option value="" disabled>Choose Employee</option>
                                 <option v-for="e in employees" :key="e.id" :value="e.id">
-                                    {{ e.name }} ({{ e.role }} • ৳{{ e.agreed_salary }})
+                                    {{ e.name }} ({{ e.role }} • {{ e.department || 'General' }} • ৳{{ e.agreed_salary }})
                                 </option>
                             </select>
                         </div>

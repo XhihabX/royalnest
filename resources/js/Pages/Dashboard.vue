@@ -19,7 +19,8 @@ import {
     Users,
     CalendarCheck,
     CreditCard,
-    CheckCircle2
+    CheckCircle2,
+    Calculator
 } from 'lucide-vue-next';
 import { useI18n } from '../Composables/useI18n';
 
@@ -57,7 +58,7 @@ const onDateChange = () => {
                 </p>
             </div>
 
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2 sm:space-x-3">
                 <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5">
                     <span class="text-xs text-slate-400 mr-2 font-medium">{{ t('date', 'Business Date') }}:</span>
                     <input 
@@ -69,11 +70,20 @@ const onDateChange = () => {
                 </div>
 
                 <Link 
+                    href="/calculator" 
+                    class="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-emerald-500/10 transition active:scale-95"
+                >
+                    <Calculator class="w-4 h-4" />
+                    <span class="hidden xs:inline">{{ t('pnl_calculator', 'P&L Calculator') }}</span>
+                    <span class="xs:hidden">ক্যালকুলেটর</span>
+                </Link>
+
+                <Link 
                     href="/sales" 
-                    class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition"
+                    class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition active:scale-95"
                 >
                     <PlusCircle class="w-4 h-4" />
-                    <span>{{ t('daily_sales', 'Enter Daily Sales') }}</span>
+                    <span>{{ t('daily_sales', 'Sales Entry') }}</span>
                 </Link>
             </div>
         </div>
@@ -236,6 +246,23 @@ const onDateChange = () => {
                             <span class="text-slate-600">•</span>
                             <Link href="/employees" class="text-xs text-slate-400 hover:text-slate-200">Staff List</Link>
                         </div>
+                    </div>
+
+                    <!-- Pending Attendance Warning Box -->
+                    <div 
+                        v-if="staffStats.attendance.unmarked > 0" 
+                        class="mb-3 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-between text-xs text-amber-200"
+                    >
+                        <div class="flex items-center space-x-2">
+                            <Clock class="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+                            <span><strong>{{ staffStats.attendance.unmarked }} জন কর্মীর</strong> আজকের হাজিরা বাকি</span>
+                        </div>
+                        <Link 
+                            href="/employees/attendance/bulk" 
+                            class="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[11px] transition shadow shrink-0 active:scale-95"
+                        >
+                            হাজিরা দিন →
+                        </Link>
                     </div>
 
                     <!-- Attendance Pill Badges -->

@@ -49,7 +49,7 @@ class EmployeeService
         $photoPath = $this->saveImageFileOrBase64($data['photo'] ?? null, 'staff');
         $nidPhotoPath = $this->saveImageFileOrBase64($data['nid_photo'] ?? null, 'staff/nid');
 
-        return Employee::create([
+        $emp = Employee::create([
             'employee_id' => $employeeId,
             'name' => trim($data['name']),
             'phone' => $data['phone'] ?? null,
@@ -60,14 +60,32 @@ class EmployeeService
             'emergency_contact' => $data['emergency_contact'] ?? null,
             'address' => $data['address'] ?? null,
             'role' => trim($data['role']),
+            'department' => $data['department'] ?? 'kitchen',
+            'tags' => is_array($data['tags'] ?? null) ? implode(', ', $data['tags']) : ($data['tags'] ?? null),
             'joining_date' => $data['joining_date'] ?? now()->toDateString(),
             'salary_type' => $data['salary_type'] ?? 'monthly',
             'agreed_salary' => (float) $data['agreed_salary'],
+            'held_salary_days' => isset($data['held_salary_days']) ? (int) $data['held_salary_days'] : 0,
+            'held_salary_amount' => isset($data['held_salary_amount']) ? (float) $data['held_salary_amount'] : 0.00,
             'hourly_rate' => isset($data['hourly_rate']) ? (float) $data['hourly_rate'] : null,
             'status' => $data['status'] ?? 'active',
             'notes' => $data['notes'] ?? null,
             'is_active' => ($data['status'] ?? 'active') === 'active',
         ]);
+
+        if (! empty($data['initial_advance']) && (float) $data['initial_advance'] > 0) {
+            $this->issueAdvance(
+                employeeId: $emp->id,
+                amount: (float) $data['initial_advance'],
+                advanceDate: $emp->joining_date ? $emp->joining_date->toDateString() : now()->toDateString(),
+                paymentAccountId: ! empty($data['payment_account_id']) ? (int) $data['payment_account_id'] : null,
+                paymentMethod: 'cash',
+                reason: 'Initial job joining advance',
+                userId: auth()->id() ?: 1
+            );
+        }
+
+        return $emp;
     }
 
     /**
@@ -83,9 +101,13 @@ class EmployeeService
             'emergency_contact' => $data['emergency_contact'] ?? null,
             'address' => $data['address'] ?? null,
             'role' => trim($data['role']),
+            'department' => $data['department'] ?? $employee->department ?? 'kitchen',
+            'tags' => isset($data['tags']) ? (is_array($data['tags']) ? implode(', ', $data['tags']) : $data['tags']) : $employee->tags,
             'joining_date' => $data['joining_date'] ?? $employee->joining_date,
             'salary_type' => $data['salary_type'] ?? $employee->salary_type,
             'agreed_salary' => (float) $data['agreed_salary'],
+            'held_salary_days' => isset($data['held_salary_days']) ? (int) $data['held_salary_days'] : (int) ($employee->held_salary_days ?? 0),
+            'held_salary_amount' => isset($data['held_salary_amount']) ? (float) $data['held_salary_amount'] : (float) ($employee->held_salary_amount ?? 0.00),
             'hourly_rate' => isset($data['hourly_rate']) ? (float) $data['hourly_rate'] : $employee->hourly_rate,
             'status' => $data['status'] ?? $employee->status,
             'notes' => $data['notes'] ?? null,
@@ -342,13 +364,27 @@ class EmployeeService
 
         $totalAdvancesTaken = $employee->advances->sum('amount');
         $outstandingAdvances = $employee->advances->sum('remaining_balance');
-        $remainingPayable = max(0, round($accruedSalary - $paidThisMonth, 2));
+
+        // Held salary deposit (Security deposit / 3-5 days on hold)
+        $heldDeposit = 0.00;
+        if ((float) $employee->held_salary_amount > 0) {
+            $heldDeposit = (float) $employee->held_salary_amount;
+        } elseif ((int) $employee->held_salary_days > 0) {
+            $dailyRate = $employee->salary_type === 'daily' 
+                ? (float) $employee->agreed_salary 
+                : round((float) $employee->agreed_salary / 30, 2);
+            $heldDeposit = round($dailyRate * (int) $employee->held_salary_days, 2);
+        }
+
+        $remainingPayable = max(0, round($accruedSalary - $paidThisMonth - $heldDeposit, 2));
 
         return [
             'employee' => $employee,
             'current_month' => $currentMonth,
             'agreed_salary' => $agreedSalary,
             'accrued_salary' => $accruedSalary,
+            'held_salary_days' => (int) ($employee->held_salary_days ?? 0),
+            'held_salary_deposit' => $heldDeposit,
             'paid_this_month' => round($paidThisMonth, 2),
             'remaining_payable' => $remainingPayable,
             'outstanding_advances' => round($outstandingAdvances, 2),

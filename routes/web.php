@@ -10,6 +10,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\FinancialAccountController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProfitCalculatorController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SmartCostController;
@@ -51,6 +52,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/cash-reconciliation', [CashReconciliationController::class, 'index'])->name('cash-reconciliation.index');
         Route::post('/cash-reconciliation', [CashReconciliationController::class, 'store'])->name('cash-reconciliation.store');
         Route::post('/cash-reconciliation/sync-sales', [CashReconciliationController::class, 'syncToSales'])->name('cash-reconciliation.sync-sales');
+
+        // Daily Profit & Loss Calculator (Raw Material Usage & Real-Time P&L)
+        Route::get('/calculator', [ProfitCalculatorController::class, 'index'])->name('calculator.index');
+        Route::post('/calculator', [ProfitCalculatorController::class, 'store'])->name('calculator.store');
     });
 
     // Inventory, Operations, Staff & Purchasing - Managers, Admins, Owners

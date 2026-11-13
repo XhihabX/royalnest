@@ -22,6 +22,7 @@ class EmployeeController extends Controller
     public function index(Request $request): Response
     {
         $status = $request->query('status', 'active');
+        $department = $request->query('department');
         $search = $request->query('search');
         $date = $request->query('date', now()->toDateString());
         $month = substr($date, 0, 7);
@@ -36,21 +37,32 @@ class EmployeeController extends Controller
             $query->where('status', $status);
         }
 
+        if ($department && $department !== 'all') {
+            $query->where('department', $department);
+        }
+
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('employee_id', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('role', 'like', "%{$search}%");
+                    ->orWhere('role', 'like', "%{$search}%")
+                    ->orWhere('department', 'like', "%{$search}%");
             });
         }
 
         $employees = $query->orderBy('name')->get();
         $accounts = FinancialAccount::where('is_active', true)->orderBy('name')->get();
 
+        $activeStaffCount = Employee::where('status', 'active')->count();
+        $unmarkedStaffCount = Employee::where('status', 'active')
+            ->whereDoesntHave('attendances', fn ($q) => $q->where('attendance_date', $date))
+            ->count();
+
         $stats = [
             'total_staff' => Employee::count(),
-            'active_staff' => Employee::where('status', 'active')->count(),
+            'active_staff' => $activeStaffCount,
+            'unmarked_today' => $unmarkedStaffCount,
             'on_leave' => Employee::where('status', 'on_leave')->count(),
             'total_advances' => Employee::withSum('advances as total_adv', 'remaining_balance')->get()->sum('total_adv'),
         ];
@@ -65,6 +77,7 @@ class EmployeeController extends Controller
             'nextEmployeeId' => $nextEmployeeId,
             'filters' => [
                 'status' => $status,
+                'department' => $department ?? 'all',
                 'search' => $search ?? '',
             ],
         ]);
@@ -135,10 +148,16 @@ class EmployeeController extends Controller
             'emergency_contact' => 'nullable|string|max:50',
             'address' => 'nullable|string|max:500',
             'role' => 'required|string|max:100',
+            'department' => 'nullable|string|max:50',
+            'tags' => 'nullable',
             'joining_date' => 'required|date',
             'salary_type' => 'required|in:monthly,daily,hourly',
             'agreed_salary' => 'required|numeric|min:0',
+            'held_salary_days' => 'nullable|integer|min:0|max:30',
+            'held_salary_amount' => 'nullable|numeric|min:0',
             'hourly_rate' => 'nullable|numeric|min:0',
+            'initial_advance' => 'nullable|numeric|min:0',
+            'payment_account_id' => 'nullable|exists:financial_accounts,id',
             'status' => 'required|in:active,inactive,on_leave,archived',
             'notes' => 'nullable|string',
             'photo' => 'nullable',
@@ -163,9 +182,13 @@ class EmployeeController extends Controller
             'emergency_contact' => 'nullable|string|max:50',
             'address' => 'nullable|string|max:500',
             'role' => 'required|string|max:100',
+            'department' => 'nullable|string|max:50',
+            'tags' => 'nullable',
             'joining_date' => 'required|date',
             'salary_type' => 'required|in:monthly,daily,hourly',
             'agreed_salary' => 'required|numeric|min:0',
+            'held_salary_days' => 'nullable|integer|min:0|max:30',
+            'held_salary_amount' => 'nullable|numeric|min:0',
             'hourly_rate' => 'nullable|numeric|min:0',
             'status' => 'required|in:active,inactive,on_leave,archived',
             'notes' => 'nullable|string',

@@ -127,11 +127,18 @@ const submitAdvance = () => {
                             <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 font-semibold capitalize">
                                 {{ profile.employee.status }}
                             </span>
+                            <span v-if="profile.employee.department" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-amber-300 border border-slate-700 font-medium capitalize">
+                                {{ profile.employee.department }}
+                            </span>
                         </div>
                         <p class="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-2">
                             <span class="text-slate-200 font-semibold">{{ profile.employee.role }}</span>
                             <span>•</span>
                             <span class="capitalize">{{ profile.employee.salary_type }} Wage</span>
+                            <span v-if="profile.held_salary_days > 0 || profile.held_salary_deposit > 0">
+                                •
+                                <span class="text-amber-400 font-medium">নিরাপত্তা জামানত: {{ profile.held_salary_days }} দিন (৳{{ profile.held_salary_deposit }})</span>
+                            </span>
                             <span>•</span>
                             <span>Phone: {{ profile.employee.phone }}</span>
                             <span v-if="profile.employee.nid_photo_url">
@@ -183,29 +190,35 @@ const submitAdvance = () => {
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4">
                     <span class="text-xs font-medium text-slate-400 block">Agreed Monthly Rate</span>
-                    <span class="text-xl font-bold font-mono text-slate-200 mt-0.5 block">৳ {{ profile.agreed_salary.toLocaleString() }}</span>
+                    <span class="text-lg sm:text-xl font-bold font-mono text-slate-200 mt-0.5 block">৳ {{ profile.agreed_salary.toLocaleString() }}</span>
                     <span class="text-[10px] text-slate-500 capitalize">{{ profile.employee.salary_type }} wage basis</span>
                 </div>
 
-                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-                    <span class="text-xs font-medium text-amber-400 block">Accrued for {{ profile.current_month }}</span>
-                    <span class="text-xl font-bold font-mono text-amber-400 mt-0.5 block">৳ {{ profile.accrued_salary.toLocaleString() }}</span>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4">
+                    <span class="text-xs font-medium text-amber-400 block">Accrued ({{ profile.current_month }})</span>
+                    <span class="text-lg sm:text-xl font-bold font-mono text-amber-400 mt-0.5 block">৳ {{ profile.accrued_salary.toLocaleString() }}</span>
                     <span class="text-[10px] text-slate-500">Based on {{ profile.attendance_summary.present }} days present</span>
                 </div>
 
-                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4">
                     <span class="text-xs font-medium text-emerald-400 block">Paid in {{ profile.current_month }}</span>
-                    <span class="text-xl font-bold font-mono text-emerald-400 mt-0.5 block">৳ {{ profile.paid_this_month.toLocaleString() }}</span>
+                    <span class="text-lg sm:text-xl font-bold font-mono text-emerald-400 mt-0.5 block">৳ {{ profile.paid_this_month.toLocaleString() }}</span>
                     <span class="text-[10px] text-slate-500">Net salary disbursed</span>
                 </div>
 
-                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-                    <span class="text-xs font-medium text-rose-400 block">Current Salary Payable</span>
-                    <span class="text-xl font-bold font-mono text-rose-400 mt-0.5 block">৳ {{ profile.remaining_payable.toLocaleString() }}</span>
-                    <span class="text-[10px] text-slate-500">Advances: ৳{{ profile.outstanding_advances.toLocaleString() }}</span>
+                <div class="bg-slate-900/80 border border-amber-500/30 rounded-2xl p-3 sm:p-4 bg-amber-500/5">
+                    <span class="text-xs font-medium text-amber-300 block">নিরাপত্তা জামানত (Held)</span>
+                    <span class="text-lg sm:text-xl font-bold font-mono text-amber-300 mt-0.5 block">৳ {{ (profile.held_salary_deposit || 0).toLocaleString() }}</span>
+                    <span class="text-[10px] text-slate-400">{{ profile.held_salary_days || 0 }} দিনের বেতন সংরক্ষিত</span>
+                </div>
+
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4 col-span-2 sm:col-span-1">
+                    <span class="text-xs font-medium text-rose-400 block">Net Payable Salary</span>
+                    <span class="text-lg sm:text-xl font-bold font-mono text-rose-400 mt-0.5 block">৳ {{ profile.remaining_payable.toLocaleString() }}</span>
+                    <span class="text-[10px] text-slate-500">জামানত বাদে প্রদেয়</span>
                 </div>
             </div>
 

@@ -57,6 +57,7 @@ class DashboardController extends Controller
             'half_day' => $todayAttendances->where('status', 'half_day')->count(),
             'absent' => $todayAttendances->where('status', 'absent')->count(),
             'leave' => $todayAttendances->where('status', 'leave')->count(),
+            'unmarked' => max(0, $activeStaffCount - $todayAttendances->count()),
             'total_active' => $activeStaffCount,
         ];
 

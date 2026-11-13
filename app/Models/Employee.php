@@ -25,9 +25,13 @@ class Employee extends Model
         'emergency_contact',
         'address',
         'role',
+        'department',
+        'tags',
         'joining_date',
         'salary_type',
         'agreed_salary',
+        'held_salary_days',
+        'held_salary_amount',
         'hourly_rate',
         'status',
         'notes',
@@ -37,6 +41,8 @@ class Employee extends Model
     protected $casts = [
         'joining_date' => 'date:Y-m-d',
         'agreed_salary' => 'decimal:2',
+        'held_salary_days' => 'integer',
+        'held_salary_amount' => 'decimal:2',
         'hourly_rate' => 'decimal:2',
         'is_active' => 'boolean',
     ];

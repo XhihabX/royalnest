@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-13] — Mobile-First PWA UI Overhaul, Interactive Daily P&L Calculator, Held Salary Deposit & 1-Tap Worker Payouts
+
+**What:**
+1. **Installable Mobile Progressive Web App (PWA) & Bottom Navigation** (`public/manifest.json`, `resources/views/app.blade.php`, `resources/js/Layouts/AppLayout.vue`):
+   - Created `public/manifest.json` (`display: standalone`) and generated home screen icons (`192x192` and `512x512`).
+   - Added iOS & Android PWA meta tags (`apple-mobile-web-app-capable`, `viewport-fit=cover, user-scalable=no`).
+   - Built a fixed mobile bottom navigation bar (`Home`, `Daily Costs`, `P&L Calculator`, `Staff`, `Menu`) and a slide-up mobile drawer sheet for all secondary modules.
+2. **Interactive Daily Profit & Loss Calculator** (`app/Http/Controllers/ProfitCalculatorController.php`, `resources/js/Pages/Calculator/Daily.vue`):
+   - Built a dedicated mobile-first calculator screen (`/calculator`) where the owner/manager enters today's sales breakdown and raw materials used today (e.g., 4 kg Beef, 2 L Oil).
+   - Automatically fetches each product's active FIFO purchase batch price (`StockBatch::where('is_exhausted', false)`), computes live cost of goods sold (COGS), adds today's accrued staff salary and operating expenses, and displays live Gross Profit, True Net Profit, and Net Margin %.
+   - One-click **Save & Sync** atomically deducts FIFO inventory batches (`ConsumptionService::recordConsumption`) and reconciles `DailySale`.
+3. **Staff Department Categorization, Attendance Missing Reminder & Held Salary (Security Deposit / জামানত)** (`database/migrations/2026_11_13_000001_enhance_employees_with_held_salary_and_departments.php`, `app/Services/EmployeeService.php`, `Employees/Index.vue`, `Employees/Profile.vue`):
+   - Added `department` (`kitchen`, `service`, `cleaning`, `cashier`, `management`), `tags`, `held_salary_days`, and `held_salary_amount` to `employees`.
+   - Implemented the held security deposit formula: $\text{Held Deposit} = \text{held\_salary\_amount} > 0 \ ? \ \text{held\_salary\_amount} : \text{round}((\text{agreed\_salary} / 30) \times \text{held\_salary\_days}, 2)$, subtracted from net disbursable salary (`remaining_payable`).
+   - Added global and per-page attendance missing alert banner when any active employee's attendance has not been recorded for the current business day.
+4. **1-Tap Worker Salary & Cash Advance Shortcut in Daily Costs** (`resources/js/Pages/Costs/Index.vue`):
+   - Added 1-tap quick action pills in Daily Cost Entry (`দৈনিক মজুরি প্রদান` & `নগদ অগ্রিম প্রদান`) that auto-populate the selected worker's daily wage rate and default to the Cash Drawer account.
+5. **Automated Verification**:
+   - Created `tests/Feature/MobileCalculatorAndStaffHoldTest.php` covering employee department & held salary creation, initial advance deduction, security deposit formula, unmarked attendance alerts, Daily P&L Calculator atomic FIFO deduction, and fast worker payouts.
+   - All 6 tests (26+ assertions) in `MobileCalculatorAndStaffHoldTest` passed 100% green; Vite production build completed with 0 errors.
+
+**Why:** Transform the system into an effortless, thumb-friendly mobile web app that can be added to the phone's home screen, provide a straightforward daily raw material P&L calculator without arbitrary multi-day amortization, enforce staff attendance reminders, and support restaurant security deposits (held salary) and fast worker cash payouts.
+**How:** Implemented PWA manifest and layout shell, created `ProfitCalculatorController` and `Calculator/Daily.vue`, extended `Employee` schema and `EmployeeService`, enhanced `Costs/Index.vue`, and verified with PHPUnit and Vite.
+**Where:** `royal-nest/app/Http/Controllers/ProfitCalculatorController.php`, `royal-nest/app/Http/Controllers/EmployeeController.php`, `royal-nest/app/Services/EmployeeService.php`, `royal-nest/resources/js/Layouts/AppLayout.vue`, `royal-nest/resources/js/Pages/Calculator/Daily.vue`, `royal-nest/resources/js/Pages/Employees/*`, `royal-nest/resources/js/Pages/Costs/Index.vue`, `royal-nest/tests/Feature/MobileCalculatorAndStaffHoldTest.php`.
+**Impact:** Complete mobile-first experience, instant daily profit calculation from actual meat/oil usage, accurate staff security deposit accounting, and zero interference with parent Saba POS repository.
+
+---
+
 ## [2026-11-12] — Complete System Re-Analysis & Logic Perfection: Wastage FIFO, Stock Count Batch Sync, Daily Sales Auto-Deposit & Supplier Bill Status
 
 **What:**

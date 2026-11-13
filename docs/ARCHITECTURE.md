@@ -16,11 +16,20 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
   - **Supplier Directory (Master Rolodex)**: Catalog of potential, active, inactive, and archived suppliers with market location, contacts, and multi-product agreed supply rates.
   - **Active Supplier Management**: Live accounts tracking purchase bills, payment vouchers, advance vouchers, and exact outstanding due payable (`Confirmed Bills - Payments - Advances`).
   - **Dedicated Supplier Profile & Statements**: Chronological bill history with item lists, payment vouchers, running due balance, and print-ready statement vouchers.
-- **Staff Management & Camera Verification**:
+- **Staff Management, Security Deposit (Held Salary) & Camera Verification**:
   - Auto-generated unique employee IDs (`EMP-001`, `EMP-002`).
   - One-tap **Live Camera Photo Snap** and **NID Card Capture** with client-side canvas compression and fallback to file upload.
+  - Department categorization (`kitchen`, `service`, `cleaning`, `cashier`, `management`) and tags.
+  - **Held Salary (Security Deposit / জামানত)**: Configurable per employee (`held_salary_days` e.g. 3 or 5 days, or custom `held_salary_amount`) held by the owner as a security buffer and subtracted from net disbursable salary.
+  - **Daily Attendance Reminder Alert**: Automatic banner and badge when any active worker's attendance is missing for the current business day.
   - Daily & Bulk Attendance grids (`Present`, `Half-day`, `Leave`, `Absent`) with duplicate date prevention.
-  - Salary accrual, partial payouts, staff advances, and advance recovery deductions with **zero double-counting of expenses**.
+  - Salary accrual, partial payouts, staff advances (including initial job joining advance), and advance recovery deductions with **zero double-counting of expenses**.
+- **Interactive Daily Profit & Loss Calculator (`/calculator`)**:
+  - Mobile-first daily worksheet where the user enters today's sales breakdown and actual raw materials used today (e.g. 4 kg Beef, 2 L Oil).
+  - Automatically computes live FIFO batch cost per ingredient, adds today's accrued staff salary and operating expenses, and previews live Gross Profit, True Net Profit, and Net Margin %.
+  - One-click **Save & Sync** atomically deducts FIFO inventory batches (`ConsumptionService`) and reconciles `DailySale`.
+- **Installable Mobile Progressive Web App (PWA)**:
+  - Standalone `manifest.json`, home screen app icons (`192x192`, `512x512`), iOS/Android web-app meta tags (`viewport-fit=cover`), sticky bottom navigation bar (`Home`, `Costs`, `Calculator`, `Staff`, `Menu`), and slide-up mobile drawer sheet.
 - Financial accounts (Cash Drawer, bKash, Nagad, Bank) with neutral internal funds transfers.
 - Accurate **Daily, Monthly, and Date Range Profit & Loss Reports**.
 - Authentic **Bilingual Localization** (Native Bengali বাংলা & English) with reactive navbar toggle.
@@ -126,6 +135,9 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
 All routes render Vue 3 components via Inertia.js with Tailwind CSS v4:
 - `/login`: Production Authentication Wall (`Auth/Login.vue`)
 - `/`: Executive Operations Dashboard with Cross-Module Cards (`Dashboard.vue`)
+- `/calculator`: Interactive Daily Profit & Loss Calculator (`Calculator/Daily.vue`)
+- `/daily-costs`: Smart Daily Cost Entry with Voice Dictation & 1-Tap Worker Payout Shortcut (`Costs/Index.vue`)
+- `/cash-reconciliation`: Daily Cash Reconciliation & Auto Sales Estimation (`Cash/Reconciliation.vue`)
 - `/sales`: Daily Sales Entry & Reconciliation (`Sales/Daily.vue`)
 - `/suppliers/directory`: Master Supplier Directory & Product Catalogs (`Suppliers/Directory.vue`)
 - `/suppliers/active`: Active Supplier Dues & Payment Settlement (`Suppliers/Active.vue`)
@@ -138,16 +150,16 @@ All routes render Vue 3 components via Inertia.js with Tailwind CSS v4:
 - `/wastage`: Spoilage & Wastage Entry with FIFO Traversal (`Wastage/Index.vue`)
 - `/stock-counts`: Physical Stock Count Audit & FIFO Batch Sync (`StockCounts/Index.vue`)
 - `/accounts`: Financial Accounts & Transfers (`Accounts/Index.vue`)
-- `/employees`: Staff Directory with Live Camera Snapshot Modal (`Employees/Index.vue`)
-- `/employees/{id}/profile`: Detailed Employee Profile, Attendance & Salary (`Employees/Profile.vue`)
+- `/employees`: Staff Directory with Department Tabs, Held Salary Settings & Camera Snapshot (`Employees/Index.vue`)
+- `/employees/{id}/profile`: Detailed Employee Profile, Held Security Deposit, Attendance & Salary (`Employees/Profile.vue`)
 - `/employees/attendance/bulk`: 1-Click Team Attendance Grid (`Employees/BulkAttendance.vue`)
 - `/reports/profit-loss`: True Profit & Loss Statement (`Reports/ProfitLoss.vue`)
 
 ---
 
 ## 6. Automated Verification Status
-- **Test Coverage**: 29 automated PHPUnit tests with 158 assertions running against native MySQL 8.4 engine (`royalnest_erp_test`), passing 100% green.
-- **Supplier & Staff Verification**: Full verification of Directory vs Active separation, due payment vouchers, cash drawer deductions, Employee ID auto-generation, and advance recovery deductions.
-- **FIFO Verification**: Scenario 3 in `tests/Feature/PrdMandatoryScenariosTest.php` and `SystemLogicPerfectionTest.php` prove previous stock retains historical price, future purchases retain incoming price, and wastage/stock counts maintain strict batch parity.
-- **Frontend Compiler**: Vite 8 compiling all production bundles with zero errors in 6.13 seconds.
-- **Production Packager**: `package_production.py` generates self-contained deployment ZIP in `dist/` (0.40 MB).
+- **Test Coverage**: 49+ automated PHPUnit tests across 10 test suites passing 100% green, including `MobileCalculatorAndStaffHoldTest.php`, `SmartCostAndCashReconciliationTest.php`, `OneTimeEntryGlobalSynchronizationTest.php`, `SystemLogicPerfectionTest.php`, and `PrdMandatoryScenariosTest.php`.
+- **Supplier & Staff Verification**: Full verification of Directory vs Active separation, due payment vouchers, cash drawer deductions, Employee ID auto-generation, held salary security deposit calculation, and advance recovery deductions.
+- **FIFO & Daily Calculator Verification**: Proves previous stock retains historical price, future purchases retain incoming price, and the Daily P&L Calculator atomically deducts FIFO batches while syncing daily sales.
+- **Frontend Compiler**: Vite 8 compiling all production bundles with zero errors in 5.16 seconds.
+- **Production Packager**: `package_production.py` generates self-contained deployment ZIP in `dist/`.

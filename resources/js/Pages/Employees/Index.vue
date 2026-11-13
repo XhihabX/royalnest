@@ -18,7 +18,11 @@ import {
     CheckCircle2, 
     AlertCircle, 
     Clock, 
-    Send
+    Send,
+    Lock,
+    ShieldAlert,
+    ChefHat,
+    ArrowUpRight
 } from 'lucide-vue-next';
 import { useI18n } from '../../Composables/useI18n';
 
@@ -35,6 +39,7 @@ const { t } = useI18n();
 
 const search = ref(props.filters?.search || '');
 const status = ref(props.filters?.status || 'active');
+const department = ref(props.filters?.department || 'all');
 const currentDate = ref(props.selectedDate);
 
 const showEmployeeModal = ref(false);
@@ -48,8 +53,14 @@ const applyFilters = () => {
     router.get('/employees', {
         search: search.value || undefined,
         status: status.value !== 'all' ? status.value : undefined,
+        department: department.value !== 'all' ? department.value : undefined,
         date: currentDate.value,
     }, { preserveState: true, replace: true });
+};
+
+const selectDepartment = (dept) => {
+    department.value = dept;
+    applyFilters();
 };
 
 const onDateChange = () => {
@@ -65,9 +76,15 @@ const empForm = useForm({
     emergency_contact: '',
     address: '',
     role: '',
+    department: 'kitchen',
+    tags: '',
     joining_date: new Date().toISOString().split('T')[0],
     salary_type: 'monthly',
     agreed_salary: '',
+    held_salary_days: 3,
+    held_salary_amount: 0,
+    initial_advance: 0,
+    payment_account_id: props.accounts.length > 0 ? props.accounts[0].id : '',
     hourly_rate: '',
     status: 'active',
     notes: '',
@@ -127,19 +144,19 @@ const submitEmployee = () => {
             <!-- Header -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
                 <div>
-                    <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+                    <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
                         <Users class="w-6 h-6 text-amber-500" />
-                        <span>{{ t('staff_directory', 'Staff Directory & Payroll Management') }}</span>
+                        <span>{{ t('staff_directory', 'Staff Directory & Payroll') }}</span>
                     </h1>
                     <p class="text-xs text-slate-400 mt-1">
-                        Employee registration, instant camera photo capture, NID documentation, attendance, and salary liabilities.
+                        Employee profiles, camera photo/NID capture, attendance tracking, held security salary, and advances.
                     </p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
                     <Link
                         href="/employees/attendance/bulk"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition shadow"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition shadow active:scale-95"
                     >
                         <CalendarCheck class="w-4 h-4 text-emerald-400" />
                         <span>{{ t('bulk_attendance', 'Bulk Attendance Entry') }}</span>
@@ -148,7 +165,7 @@ const submitEmployee = () => {
                     <button
                         type="button"
                         @click="showEmployeeModal = true"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-lg shadow-amber-950 transition active:scale-95 shrink-0"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-lg shadow-amber-950 transition active:scale-95 shrink-0 cursor-pointer"
                     >
                         <Plus class="w-4 h-4" />
                         <span>{{ t('add_employee', 'Add Staff Member') }}</span>
@@ -156,50 +173,154 @@ const submitEmployee = () => {
                 </div>
             </div>
 
-            <!-- Stats Bar -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-                    <div>
-                        <span class="text-xs font-medium text-slate-400 block">Total Staff Members</span>
-                        <span class="text-2xl font-bold text-slate-100 mt-0.5 block">{{ stats.total_staff }}</span>
+            <!-- Attendance Missing Reminder Banner -->
+            <div 
+                v-if="stats.unmarked_today > 0" 
+                class="bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-500/50 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in"
+            >
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                        <Clock class="w-5 h-5 animate-pulse" />
                     </div>
-                    <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <div>
+                        <h3 class="text-xs sm:text-sm font-bold text-white">
+                            {{ stats.unmarked_today }} জন কর্মীর আজকের হাজিরা এখনো এন্ট্রি করা হয়নি!
+                        </h3>
+                        <p class="text-[11px] text-amber-200/80 mt-0.5">
+                            দৈনিক সঠিক লাভ-ক্ষতি ও সঠিক বেতন নির্ধারণের জন্য প্রতিদিন কর্মীদের হাজিরা প্রদান আবশ্যক।
+                        </p>
+                    </div>
+                </div>
+
+                <Link
+                    href="/employees/attendance/bulk"
+                    class="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow shrink-0 active:scale-95"
+                >
+                    <span>এখনই হাজিরা দিন</span>
+                    <ArrowUpRight class="w-4 h-4" />
+                </Link>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-medium text-slate-400 block">Total Staff</span>
+                        <span class="text-xl sm:text-2xl font-bold text-slate-100 mt-0.5 block">{{ stats.total_staff }}</span>
+                    </div>
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
                         <Users class="w-5 h-5" />
                     </div>
                 </div>
 
-                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4 flex items-center justify-between">
                     <div>
                         <span class="text-xs font-medium text-emerald-400 block">Active Employees</span>
-                        <span class="text-2xl font-bold font-mono text-emerald-400 mt-0.5 block">{{ stats.active_staff }}</span>
+                        <span class="text-xl sm:text-2xl font-bold font-mono text-emerald-400 mt-0.5 block">{{ stats.active_staff }}</span>
                     </div>
-                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
                         <CheckCircle2 class="w-5 h-5" />
                     </div>
                 </div>
 
-                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4 flex items-center justify-between">
                     <div>
-                        <span class="text-xs font-medium text-amber-400 block">On Leave</span>
-                        <span class="text-2xl font-bold font-mono text-amber-400 mt-0.5 block">{{ stats.on_leave }}</span>
+                        <span class="text-xs font-medium text-amber-400 block">Pending Attendance</span>
+                        <span class="text-xl sm:text-2xl font-bold font-mono text-amber-400 mt-0.5 block">{{ stats.unmarked_today }}</span>
                     </div>
-                    <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
                         <Clock class="w-5 h-5" />
                     </div>
                 </div>
 
-                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4 flex items-center justify-between">
                     <div>
-                        <span class="text-xs font-medium text-rose-400 block">{{ t('advance_balance', 'Staff Advances Due') }}</span>
-                        <span class="text-2xl font-bold font-mono text-rose-400 mt-0.5 block">৳ {{ stats.total_advances.toLocaleString() }}</span>
+                        <span class="text-xs font-medium text-rose-400 block">Staff Advances Due</span>
+                        <span class="text-xl sm:text-2xl font-bold font-mono text-rose-400 mt-0.5 block">৳ {{ stats.total_advances.toLocaleString() }}</span>
                     </div>
-                    <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
                         <Send class="w-5 h-5" />
                     </div>
                 </div>
             </div>
 
-            <!-- Filters Bar -->
+            <!-- Department Category Filter Tabs (Pills) -->
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                <button
+                    type="button"
+                    @click="selectDepartment('all')"
+                    :class="[
+                        'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 cursor-pointer',
+                        department === 'all' 
+                            ? 'bg-amber-500 text-slate-950 shadow-md font-bold' 
+                            : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                    ]"
+                >
+                    {{ t('dept_all', 'সব বিভাগ (All)') }}
+                </button>
+                <button
+                    type="button"
+                    @click="selectDepartment('kitchen')"
+                    :class="[
+                        'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 cursor-pointer',
+                        department === 'kitchen' 
+                            ? 'bg-amber-500 text-slate-950 shadow-md font-bold' 
+                            : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                    ]"
+                >
+                    🍳 {{ t('dept_kitchen', 'বাবুর্চি / রান্নাঘর (Kitchen)') }}
+                </button>
+                <button
+                    type="button"
+                    @click="selectDepartment('service')"
+                    :class="[
+                        'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 cursor-pointer',
+                        department === 'service' 
+                            ? 'bg-amber-500 text-slate-950 shadow-md font-bold' 
+                            : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                    ]"
+                >
+                    🛎️ {{ t('dept_service', 'পরিবেশন / ওয়েটার (Service)') }}
+                </button>
+                <button
+                    type="button"
+                    @click="selectDepartment('cleaning')"
+                    :class="[
+                        'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 cursor-pointer',
+                        department === 'cleaning' 
+                            ? 'bg-amber-500 text-slate-950 shadow-md font-bold' 
+                            : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                    ]"
+                >
+                    🧹 {{ t('dept_cleaning', 'পরিচ্ছন্নতা কর্মী (Cleaning)') }}
+                </button>
+                <button
+                    type="button"
+                    @click="selectDepartment('cashier')"
+                    :class="[
+                        'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 cursor-pointer',
+                        department === 'cashier' 
+                            ? 'bg-amber-500 text-slate-950 shadow-md font-bold' 
+                            : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                    ]"
+                >
+                    💵 {{ t('dept_cashier', 'ক্যাশিয়ার (Cashier)') }}
+                </button>
+                <button
+                    type="button"
+                    @click="selectDepartment('management')"
+                    :class="[
+                        'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 cursor-pointer',
+                        department === 'management' 
+                            ? 'bg-amber-500 text-slate-950 shadow-md font-bold' 
+                            : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                    ]"
+                >
+                    👔 {{ t('dept_management', 'ম্যানেজমেন্ট (Management)') }}
+                </button>
+            </div>
+
+            <!-- Search & Date Filter Bar -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-3 flex-1">
                     <div class="relative flex-1 max-w-xs">
@@ -245,7 +366,7 @@ const submitEmployee = () => {
                             <tr>
                                 <th class="px-5 py-3.5">{{ t('staff_name', 'Employee Profile') }}</th>
                                 <th class="px-4 py-3.5">{{ t('phone', 'Phone & NID') }}</th>
-                                <th class="px-4 py-3.5">{{ t('role', 'Role & Type') }}</th>
+                                <th class="px-4 py-3.5">বিভাগ ও জামানত</th>
                                 <th class="px-4 py-3.5 text-right">{{ t('agreed_salary', 'Agreed Salary') }}</th>
                                 <th class="px-4 py-3.5 text-center">{{ t('attendance', 'Today Attendance') }}</th>
                                 <th class="px-5 py-3.5 text-right">{{ t('actions', 'Actions') }}</th>
@@ -304,11 +425,21 @@ const submitEmployee = () => {
                                     </div>
                                 </td>
                                 <td class="px-4 py-4">
-                                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-200 border border-slate-700">
-                                        {{ emp.role }}
-                                    </span>
+                                    <div class="flex flex-wrap items-center gap-1">
+                                        <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-800 text-slate-200 border border-slate-700 capitalize">
+                                            {{ emp.department || emp.role }}
+                                        </span>
+                                        <span 
+                                            v-if="emp.held_salary_days > 0 || emp.held_salary_amount > 0"
+                                            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 border border-amber-500/30 text-amber-300"
+                                            title="Held security deposit"
+                                        >
+                                            <Lock class="w-2.5 h-2.5" />
+                                            <span>জামানত: {{ emp.held_salary_days }} দিন</span>
+                                        </span>
+                                    </div>
                                     <span class="block text-[11px] text-slate-500 mt-1 capitalize">
-                                        {{ emp.salary_type }} wage
+                                        {{ emp.role }} • {{ emp.salary_type }}
                                     </span>
                                 </td>
                                 <td class="px-4 py-4 text-right">
@@ -323,28 +454,28 @@ const submitEmployee = () => {
                                     <div class="inline-flex rounded-lg border border-slate-800 p-0.5 bg-slate-950">
                                         <button 
                                             @click="markAttendance(emp.id, 'present')"
-                                            :class="['px-2 py-0.5 rounded text-xs font-semibold transition', getAttendanceStatus(emp) === 'present' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200']"
+                                            :class="['px-2.5 py-1 rounded text-xs font-semibold transition', getAttendanceStatus(emp) === 'present' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200']"
                                             title="Present"
                                         >
                                             P
                                         </button>
                                         <button 
                                             @click="markAttendance(emp.id, 'half_day')"
-                                            :class="['px-2 py-0.5 rounded text-xs font-semibold transition', getAttendanceStatus(emp) === 'half_day' ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-slate-200']"
+                                            :class="['px-2.5 py-1 rounded text-xs font-semibold transition', getAttendanceStatus(emp) === 'half_day' ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-slate-200']"
                                             title="Half Day"
                                         >
                                             H
                                         </button>
                                         <button 
                                             @click="markAttendance(emp.id, 'leave')"
-                                            :class="['px-2 py-0.5 rounded text-xs font-semibold transition', getAttendanceStatus(emp) === 'leave' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200']"
+                                            :class="['px-2.5 py-1 rounded text-xs font-semibold transition', getAttendanceStatus(emp) === 'leave' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200']"
                                             title="Leave"
                                         >
                                             L
                                         </button>
                                         <button 
                                             @click="markAttendance(emp.id, 'absent')"
-                                            :class="['px-2 py-0.5 rounded text-xs font-semibold transition', getAttendanceStatus(emp) === 'absent' ? 'bg-rose-600 text-white shadow' : 'text-slate-400 hover:text-slate-200']"
+                                            :class="['px-2.5 py-1 rounded text-xs font-semibold transition', getAttendanceStatus(emp) === 'absent' ? 'bg-rose-600 text-white shadow' : 'text-slate-400 hover:text-slate-200']"
                                             title="Absent"
                                         >
                                             A
@@ -374,7 +505,7 @@ const submitEmployee = () => {
             </div>
         </div>
 
-        <!-- Modal: Add New Staff Member with Camera Capture -->
+        <!-- Modal: Add New Staff Member with Camera Capture & Held Salary Settings -->
         <div v-if="showEmployeeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl my-8">
                 <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
@@ -385,7 +516,7 @@ const submitEmployee = () => {
                     <button type="button" @click="showEmployeeModal = false" class="text-slate-400 hover:text-slate-200"><X class="w-5 h-5" /></button>
                 </div>
 
-                <form @submit.prevent="submitEmployee" class="p-6 space-y-4">
+                <form @submit.prevent="submitEmployee" class="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
                     <!-- Photo & NID Camera Section -->
                     <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
                         <span class="text-xs font-semibold text-slate-300 block mb-3">Live Camera Photo & NID Capture</span>
@@ -402,7 +533,7 @@ const submitEmployee = () => {
                                 <button
                                     type="button"
                                     @click="openCamera('photo')"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium text-xs shadow transition"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium text-xs shadow transition cursor-pointer"
                                 >
                                     <Camera class="w-3.5 h-3.5" />
                                     <span>{{ empForm.photo ? 'Retake' : 'Camera Snap' }}</span>
@@ -421,7 +552,7 @@ const submitEmployee = () => {
                                 <button
                                     type="button"
                                     @click="openCamera('nid')"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition cursor-pointer"
                                 >
                                     <Camera class="w-3.5 h-3.5 text-amber-400" />
                                     <span>{{ empForm.nid_photo ? 'Retake NID' : 'Capture NID' }}</span>
@@ -438,7 +569,7 @@ const submitEmployee = () => {
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-300 mb-1.5">Full Name *</label>
-                            <input v-model="empForm.name" type="text" required placeholder="e.g. Kamal Hossain" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500" />
+                            <input v-model="empForm.name" type="text" required placeholder="e.g. কামাল হোসেন" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500" />
                         </div>
                     </div>
 
@@ -453,46 +584,122 @@ const submitEmployee = () => {
                         </div>
                     </div>
 
+                    <!-- Department & Role -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">NID Number (Optional)</label>
-                            <input v-model="empForm.nid_number" type="text" placeholder="National ID card number" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500" />
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">বিভাগ (Department) *</label>
+                            <select v-model="empForm.department" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+                                <option value="kitchen">🍳 রান্নাঘর / বাবুর্চি (Kitchen)</option>
+                                <option value="service">🛎️ পরিবেশন / ওয়েটার (Service)</option>
+                                <option value="cleaning">🧹 পরিচ্ছন্নতা কর্মী (Cleaning)</option>
+                                <option value="cashier">💵 ক্যাশিয়ার (Cashier)</option>
+                                <option value="management">👔 ম্যানেজমেন্ট (Management)</option>
+                            </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Emergency Contact</label>
-                            <input v-model="empForm.emergency_contact" type="text" placeholder="Brother: 019XXXXXXXX" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500" />
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">পদবী (Role / Title) *</label>
+                            <input v-model="empForm.role" type="text" required placeholder="যেমন: হেড কুক, সহকারী, ওয়েটার" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500" />
+                        </div>
+                    </div>
+
+                    <!-- Salary & Type -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">বেতনের ধরন (Salary Type) *</label>
+                            <select v-model="empForm.salary_type" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+                                <option value="monthly">মাসিক বেতন (Monthly Fixed)</option>
+                                <option value="daily">দৈনিক হাজিরা মজুরি (Daily Wage)</option>
+                                <option value="hourly">ঘণ্টাভিত্তিক মজুরি (Hourly Rate)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">ধার্যকৃত বেতন (৳) *</label>
+                            <input v-model.number="empForm.agreed_salary" type="number" step="0.01" required placeholder="e.g. 18000" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-500" />
+                        </div>
+                    </div>
+
+                    <!-- NEW: Held Salary Security Deposit Settings (জামানত) -->
+                    <div class="bg-gradient-to-r from-amber-950/40 to-slate-950 border border-amber-500/30 rounded-xl p-4 space-y-3">
+                        <div class="flex items-center space-x-2">
+                            <Lock class="w-4 h-4 text-amber-400" />
+                            <h4 class="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                                বেতন অন-হোল্ড / নিরাপত্তা জামানত (Held Salary)
+                            </h4>
+                        </div>
+                        <p class="text-[11px] text-slate-400">
+                            কর্মী না বলে চাকরি ছেড়ে চলে যাওয়া রোধে মালিকের কাছে ৩ দিন বা ৫ দিনের বেতন জামানত রাখা যায় (বাধ্যতামূলক নয়)।
+                        </p>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] text-slate-300 font-medium mb-1">অন-হোল্ড দিন (দিন)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="30"
+                                    v-model.number="empForm.held_salary_days"
+                                    placeholder="৩ বা ৫ দিন"
+                                    class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-500"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-300 font-medium mb-1">নির্দিষ্ট টাকা (ঐচ্ছিক)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    v-model.number="empForm.held_salary_amount"
+                                    placeholder="0.00"
+                                    class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-500"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Initial Cash Advance -->
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                        <div class="flex items-center space-x-2">
+                            <Send class="w-4 h-4 text-rose-400" />
+                            <h4 class="text-xs font-bold text-slate-200">
+                                কাজে যোগদানের সময় অগ্রিম টাকা (Initial Advance)
+                            </h4>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] text-slate-300 font-medium mb-1">অগ্রিম টাকার পরিমাণ (৳)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    v-model.number="empForm.initial_advance"
+                                    placeholder="0.00"
+                                    class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-500"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-300 font-medium mb-1">পেমেন্ট অ্যাকাউন্ট</label>
+                                <select v-model="empForm.payment_account_id" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none">
+                                    <option v-for="acc in accounts" :key="acc.id" :value="acc.id">
+                                        {{ acc.name }} (৳{{ acc.current_balance }})
+                                    </option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Designation / Role *</label>
-                            <input v-model="empForm.role" type="text" required placeholder="e.g. Cook, Chef, Waiter, Cleaner" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500" />
-                        </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-300 mb-1.5">Joining Date *</label>
                             <input v-model="empForm.joining_date" type="date" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500" />
                         </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Salary Type *</label>
-                            <select v-model="empForm.salary_type" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
-                                <option value="monthly">Monthly Fixed Salary</option>
-                                <option value="daily">Daily Wage Rate</option>
-                                <option value="hourly">Hourly Rate</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Agreed Salary (৳) *</label>
-                            <input v-model.number="empForm.agreed_salary" type="number" step="0.01" required placeholder="e.g. 18000" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-500" />
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Emergency Contact</label>
+                            <input v-model="empForm.emergency_contact" type="text" placeholder="ভাই/স্ত্রী: 019XXXXXXXX" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500" />
                         </div>
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-300 mb-1.5">Address</label>
-                        <textarea v-model="empForm.address" rows="2" placeholder="Present living address..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"></textarea>
+                        <textarea v-model="empForm.address" rows="2" placeholder="বর্তমান বসবাসের ঠিকানা..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"></textarea>
                     </div>
 
                     <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
