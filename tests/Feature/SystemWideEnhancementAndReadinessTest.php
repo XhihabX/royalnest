@@ -269,12 +269,27 @@ class SystemWideEnhancementAndReadinessTest extends TestCase
         $product->update(['current_stock' => 10.0]);
         $this->cashAccount->update(['current_balance' => 50000.00 - 1200.00]);
 
-        // Case 1: Stock is 100% intact -> Clean Void succeeds
+        // Case 1: Stock is 100% intact -> Clean Void succeeds without creating a fake account deposit
         $result = $this->reversalService->voidPurchase($purchase, 'Typo duplicate entry');
         $this->assertTrue($result['success']);
         $this->assertEquals(0, $product->fresh()->current_stock);
         $this->assertEquals('voided', $purchase->fresh()->reversal_status);
-        $this->assertEquals(50000.00, $this->cashAccount->fresh()->current_balance);
+        // Financial account does NOT receive fake deposit (remains 48800.00)
+        $this->assertEquals(48800.00, (float) $this->cashAccount->fresh()->current_balance);
+        // Supplier holds credit note of -1200.00
+        $this->assertEquals(-1200.00, (float) $supplier->fresh()->current_balance);
+
+        // When physical money is actually refunded by the vendor:
+        $this->reversalService->recordSupplierRefund(
+            supplier: $supplier,
+            amount: 1200.00,
+            receivingAccountId: $this->cashAccount->id,
+            refundDate: now()->toDateString(),
+            reference: 'REF-RET-001',
+            notes: 'Actual money refunded for returned intact batch'
+        );
+        $this->assertEquals(50000.00, (float) $this->cashAccount->fresh()->current_balance);
+        $this->assertEquals(0.00, (float) $supplier->fresh()->current_balance);
 
         // Case 2: Stock partially consumed -> Full void without partial flag is BLOCKED
         $purchase2 = Purchase::create([

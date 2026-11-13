@@ -414,7 +414,7 @@ class FinalProductionRefinementsTest extends TestCase
             'category' => 'Fish',
             'status' => 'active',
             'opening_balance' => 0,
-            'current_balance' => 0,
+            'current_balance' => -2500.00, // ৳2500 credit balance owed by vendor to restaurant
         ]);
 
         $initialBalance = (float) $this->cashAccount->current_balance;
@@ -431,8 +431,8 @@ class FinalProductionRefinementsTest extends TestCase
 
         // Account receives real deposit
         $this->assertEquals($initialBalance + 2500.00, (float) $this->cashAccount->fresh()->current_balance);
-        // Supplier balance credited
-        $this->assertEquals(2500.00, (float) $supplier->fresh()->current_balance);
+        // Supplier credit balance cleared to 0
+        $this->assertEquals(0.00, (float) $supplier->fresh()->current_balance);
     }
 
     /**

@@ -143,10 +143,15 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
   - Automatically captures authentication, financial vouchers, inventory movements, staff management, and system administration events.
   - Prevents updates or deletes at the model level via `AccessDeniedHttpException`.
 - `ReversalService`:
-  - Segregates bookkeeping voids from real-world money refunds.
-  - Implements FIFO purchase batch reversal matrix: 100% intact shelf stock unwound with compensating `purchase_return` ledger movement. Partially consumed stock safely blocked from full voiding; when partial return is approved (`$allowPartialReturn = true`), remaining physical shelf stock is returned via compensating `purchase_return` ledger entries, while supplier due liability is credited up to the returned shelf stock value (`$totalReturnedValue`) without erasing legitimate kitchen consumption cost. Fully consumed stock strictly blocked from voiding.
+  - Segregates bookkeeping voids from real-world money refunds with strict separation.
+  - **Zero Fake Account Deposits**: `voidPurchase` never deposits funds into financial accounts. Voiding an invoice or returning goods simply returns shelf stock via compensating `purchase_return` ledger entries and adjusts supplier balances.
+  - **Uncapped Supplier Credit Notes**: Decrements supplier balance by the full returned shelf stock value (`$totalReturnedValue`). If the original purchase was fully or partially paid, decrementing creates or increases a persistent credit note (negative `current_balance`), representing funds or goods owed by the vendor to the restaurant.
+  - **Future Purchase Credit Absorption**: When future purchases are made from the vendor on credit (`paid_amount = 0`), the new bill increment automatically absorbs and settles the supplier credit balance without touching financial accounts or creating fake income.
+  - **Strict Refund Enforcement**: `recordSupplierRefund` validates that a cash/bank refund can ONLY be received if the supplier holds an active credit note (`current_balance < 0`), and caps the refund at the available credit balance (`abs($current_balance)`), preventing double-crediting or duplicate refunds.
   - Voids mistaken supplier payments, salary payouts, advances, operating expenses, and daily sales by neutralizing fictitious ledger effects and restoring linked balances.
-  - Records real-world supplier and employee cash/bank refunds into specified active accounts.
+- `SupplierService::getSupplierStatement`:
+  - Dynamically renders purchase bills, credit notes (`type = 'credit_note'`, net effect: $-V_{\text{ret}}$), payment vouchers, advance vouchers, and supplier refund vouchers (`type = 'refund_voucher'`, net effect: $+R$).
+  - Guarantees that cumulative running due matches the live `$supplier->current_balance` at every single line.
 - `ReportController` & Outflow Classification:
   - Explicitly separates **Total Account Outflows** into:
     - **Actual Physical Cash Outflows** (`actual_cash_outflows`): Outflows strictly tied to accounts of type `cash` (Cash Drawer).

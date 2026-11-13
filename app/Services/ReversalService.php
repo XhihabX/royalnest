@@ -35,7 +35,7 @@ class ReversalService
      */
     public function voidPurchase(Purchase $purchase, string $reason, bool $allowPartialReturn = false): array
     {
-        if ($purchase->reversal_status !== 'active') {
+        if (in_array($purchase->reversal_status, ['voided', 'reversed'])) {
             throw ValidationException::withMessages([
                 'purchase' => 'This purchase has already been reversed or voided.',
             ]);
@@ -131,35 +131,19 @@ class ReversalService
                 $totalReturnedValue += ($returnQty * (float) $info['item']->unit_price);
             }
 
-            // 4. Financial ledger adjustments
-            $paidAmount = (float) $purchase->paid_amount;
+            // 4. Financial and supplier ledger adjustments (Strict Separation: No fake account deposits!)
             $supplier = $purchase->supplier ? Supplier::lockForUpdate()->find($purchase->supplier_id) : null;
 
-            // If cash/account funds were disbursed and this entry is voided/returned:
-            // Neutralize the payment back into the originating account or active cash drawer
-            if ($paidAmount > 0) {
-                $refundAmount = $hasConsumedItems ? min($paidAmount, $totalReturnedValue) : $paidAmount;
-                $targetAccountId = $purchase->payment_account_id ?: FinancialAccount::where('type', 'cash')->where('is_active', true)->value('id');
-                if ($targetAccountId && $refundAmount > 0) {
-                    $this->accountService->deposit(
-                        accountId: $targetAccountId,
-                        amount: $refundAmount,
-                        date: now()->toDateString(),
-                        referenceType: 'PurchaseVoid',
-                        referenceId: $purchase->id,
-                        notes: "Compensating deposit for voided Purchase #{$purchase->invoice_no}: {$reason}"
-                    );
-                }
+            // Reduce supplier due payable or create/increase supplier credit note by the full returned shelf stock value.
+            // If the purchase was fully or partially paid, decrementing current_balance naturally creates or increases
+            // a persistent credit balance (negative current_balance), representing money/goods owed by supplier.
+            if ($supplier && $totalReturnedValue > 0) {
+                $supplier->decrement('current_balance', $totalReturnedValue);
             }
 
-            // Reduce supplier due payable by the returned shelf stock value
-            $unpaidAmount = max(0, (float) $purchase->total_amount - $paidAmount);
-            if ($supplier && $unpaidAmount > 0) {
-                $reduction = $hasConsumedItems ? min($unpaidAmount, $totalReturnedValue) : $unpaidAmount;
-                if ($reduction > 0) {
-                    $supplier->decrement('current_balance', $reduction);
-                }
-            }
+            // Note: Zero automatic deposit into financial accounts.
+            // A purchase void or return is NEVER treated as proof that physical money has been returned.
+            // If the vendor physically refunds cash or bank funds, that is recorded via recordSupplierRefund().
 
             // 5. Update purchase record status
             $purchase->update([
@@ -192,7 +176,7 @@ class ReversalService
      */
     public function voidSupplierPayment(SupplierPayment $payment, string $reason): void
     {
-        if ($payment->reversal_status !== 'active') {
+        if (in_array($payment->reversal_status, ['voided', 'reversed'])) {
             throw ValidationException::withMessages([
                 'payment' => 'This payment voucher has already been voided or reversed.',
             ]);
@@ -256,6 +240,8 @@ class ReversalService
 
     /**
      * Record an Actual Money Refund received from a supplier.
+     * Enforces that the supplier must have an active credit note / credit balance (current_balance < 0),
+     * and that the refund cannot exceed the available credit balance.
      */
     public function recordSupplierRefund(
         Supplier $supplier,
@@ -265,12 +251,33 @@ class ReversalService
         string $reference,
         string $notes
     ): void {
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => 'Refund amount must be greater than zero.',
+            ]);
+        }
+
         DB::transaction(function () use ($supplier, $amount, $receivingAccountId, $refundDate, $reference, $notes) {
+            $lockedSupplier = Supplier::lockForUpdate()->findOrFail($supplier->id);
             $account = FinancialAccount::lockForUpdate()->findOrFail($receivingAccountId);
 
             if (!$account->is_active) {
                 throw ValidationException::withMessages([
                     'receiving_account_id' => 'The selected receiving account is inactive.',
+                ]);
+            }
+
+            // A refund can only be received if the supplier holds an active credit note / credit balance (current_balance < 0)
+            $creditBalance = max(0, -1 * (float) $lockedSupplier->current_balance);
+            if ($creditBalance <= 0) {
+                throw ValidationException::withMessages([
+                    'amount' => "Cannot record refund: Supplier '{$lockedSupplier->name}' has no credit balance (Current balance: ৳{$lockedSupplier->current_balance}).",
+                ]);
+            }
+
+            if (round($amount, 2) > round($creditBalance, 2)) {
+                throw ValidationException::withMessages([
+                    'amount' => "Refund amount (৳{$amount}) exceeds the supplier's available credit balance of ৳{$creditBalance}.",
                 ]);
             }
 
@@ -280,17 +287,17 @@ class ReversalService
                 amount: $amount,
                 date: $refundDate,
                 referenceType: 'SupplierRefund',
-                referenceId: $supplier->id,
-                notes: "Supplier Cash Refund from {$supplier->company_name} (Ref: {$reference}): {$notes}"
+                referenceId: $lockedSupplier->id,
+                notes: "Supplier Cash Refund from {$lockedSupplier->company_name} (Ref: {$reference}): {$notes}"
             );
 
-            // Re-credit supplier ledger
-            $supplier->increment('current_balance', $amount);
+            // Settle supplier credit ledger (brings negative balance closer to 0)
+            $lockedSupplier->increment('current_balance', $amount);
 
             AuditLogger::log(
                 action: 'refund_received',
-                description: "Received ৳{$amount} cash refund from {$supplier->company_name} into {$account->name} (Ref: {$reference})",
-                entity: $supplier,
+                description: "Received ৳{$amount} cash refund from {$lockedSupplier->company_name} into {$account->name} (Ref: {$reference})",
+                entity: $lockedSupplier,
                 reason: $notes,
                 module: 'suppliers',
                 transactionReference: $reference
@@ -303,7 +310,7 @@ class ReversalService
      */
     public function voidSalaryPayment(SalaryPayment $payment, string $reason): void
     {
-        if ($payment->reversal_status !== 'active') {
+        if (in_array($payment->reversal_status, ['voided', 'reversed'])) {
             throw ValidationException::withMessages([
                 'payment' => 'This salary payment has already been voided or reversed.',
             ]);
@@ -350,7 +357,7 @@ class ReversalService
      */
     public function voidEmployeeAdvance(EmployeeAdvance $advance, string $reason): void
     {
-        if ($advance->reversal_status !== 'active') {
+        if (in_array($advance->reversal_status, ['voided', 'reversed'])) {
             throw ValidationException::withMessages([
                 'advance' => 'This staff advance has already been voided or reversed.',
             ]);
@@ -458,7 +465,7 @@ class ReversalService
      */
     public function voidOperatingExpense(OperatingExpense $expense, string $reason): void
     {
-        if ($expense->reversal_status !== 'active') {
+        if (in_array($expense->reversal_status, ['voided', 'reversed'])) {
             throw ValidationException::withMessages([
                 'expense' => 'This expense has already been voided or reversed.',
             ]);
@@ -505,7 +512,7 @@ class ReversalService
      */
     public function voidDailySale(DailySale $sale, string $reason): void
     {
-        if ($sale->reversal_status !== 'active') {
+        if (in_array($sale->reversal_status, ['voided', 'reversed'])) {
             throw ValidationException::withMessages([
                 'sale' => 'This daily sales entry has already been voided or reversed.',
             ]);

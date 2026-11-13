@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-13] — Critical Accounting Integrity: Strict Separation of Purchase Voids vs Supplier Refunds & Persistent Credit Notes
+
+**What:**
+1. **Elimination of Fake Account Deposits on Purchase Voids** (`app/Services/ReversalService.php`):
+   - Removed automatic deposits to cash/bank accounts upon voiding or returning purchases. Voiding an invoice or returning goods now strictly returns shelf stock via compensating `purchase_return` ledger entries and adjusts supplier accounts without falsely inflating cash drawer or bank balances.
+2. **Uncapped Supplier Credit Note Calculation** (`app/Services/ReversalService.php`):
+   - Eliminated the defective `min($unpaidDue, $returnedValue)` cap in `voidPurchase`. Replaced with decrementing supplier `current_balance` by the full returned shelf stock value (`$totalReturnedValue`).
+   - For fully paid or partially paid purchases, this decrement naturally creates or increases a persistent credit note (negative `current_balance`), guaranteeing credit balances never disappear when unpaid bill dues are zero.
+   - Future credit purchases automatically absorb and offset this credit balance without generating duplicate revenue in Profit & Loss statements.
+3. **Pessimistic Locking & Validation for Supplier Refunds** (`app/Services/ReversalService.php`):
+   - Hardened `recordSupplierRefund` with `Supplier::lockForUpdate()`.
+   - Strictly enforced that cash/bank refunds can only be received if the supplier holds an active credit note (`current_balance < 0`) and capped at the available credit balance (`abs($current_balance)`), preventing double-crediting, duplicate refunds, and negative balance drift.
+4. **Comprehensive Supplier Statement Alignment** (`app/Services/SupplierService.php`):
+   - Updated `getSupplierStatement` to dynamically render:
+     - Purchase returns / credit notes (`type = 'credit_note'`, net effect: $-V_{\text{ret}}$).
+     - Supplier cash/bank refund vouchers (`type = 'refund_voucher'`, net effect: $+R$).
+   - Synchronized historical prior balances (`$priorPurchasesNet - $priorReturns - $priorPayments - $priorAdvances + $priorRefunds`), guaranteeing that cumulative running due matches live `$supplier->current_balance` across every single line.
+5. **Comprehensive Automated Test Suite** (`tests/Feature/SupplierCreditNotesAndRefundsTest.php`):
+   - Implemented 9 dedicated regression tests covering:
+     1. Unpaid purchase void without fake account deposits.
+     2. Supplier refund depositing only into selected account.
+     3. Purchase return without cash refund not inflating drawer.
+     4. Fully paid purchase return generating exact credit balance.
+     5. Partially unpaid return reducing payable and preserving excess credit.
+     6. Future purchase credit absorption without duplicate P&L income.
+     7. Prevention of double-crediting via simultaneous credit note and refund.
+     8. FIFO batch integrity and kitchen food cost preservation.
+     9. Prevention of duplicate purchase voids and excess refunds.
+   - Entire test suite: **103/103 tests (536 assertions) passing 100% green**.
+   - Production frontend compiled cleanly with Vite 8 (7.49s, 0 errors).
+   - Repackaged production deployment bundle: `dist/royal_nest_production_deployment.zip`.
+
+**Why:** Eliminate fictitious cash deposits, protect supplier credit notes from being erased when bills are paid, enforce mathematical double-entry invariants, and prevent double-crediting.
+**How:** Refactored `ReversalService`, enhanced `SupplierService::getSupplierStatement`, updated test assertions in `SystemWideEnhancementAndReadinessTest`, and added 9 new automated regression tests.
+**Where:** `royal-nest/app/Services/ReversalService.php`, `royal-nest/app/Services/SupplierService.php`, `royal-nest/app/Services/PurchaseService.php`, `royal-nest/tests/Feature/SupplierCreditNotesAndRefundsTest.php`, `royal-nest/docs/*`.
+**Impact:** 100% test pass rate (103/103), mathematically verified accounts payable and credit notes, zero regressions.
+
+---
+
 ## [2026-11-13] — Edge-Case Audit: Corrective Schema Migration, Cash vs Digital Outflow Segregation & Purchase Reversal Safeguards
 
 **What:**

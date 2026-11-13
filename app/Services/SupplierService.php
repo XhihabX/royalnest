@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\AccountTransaction;
 use App\Models\Purchase;
+use App\Models\StockLedger;
 use App\Models\Supplier;
 use App\Models\SupplierAdvance;
 use App\Models\SupplierPayment;
@@ -379,25 +381,33 @@ class SupplierService
         $advancesQuery = SupplierAdvance::with(['account', 'creator'])
             ->where('supplier_id', $supplier->id);
 
+        $refundsQuery = AccountTransaction::with(['financialAccount', 'creator'])
+            ->where('reference_type', 'SupplierRefund')
+            ->where('reference_id', $supplier->id);
+
         if ($startDate) {
             $purchasesQuery->whereDate('purchase_date', '>=', $startDate);
             $paymentsQuery->whereDate('payment_date', '>=', $startDate);
             $advancesQuery->whereDate('advance_date', '>=', $startDate);
+            $refundsQuery->whereDate('transaction_date', '>=', $startDate);
         }
         if ($endDate) {
             $purchasesQuery->whereDate('purchase_date', '<=', $endDate);
             $paymentsQuery->whereDate('payment_date', '<=', $endDate);
             $advancesQuery->whereDate('advance_date', '<=', $endDate);
+            $refundsQuery->whereDate('transaction_date', '<=', $endDate);
         }
 
         $purchases = $purchasesQuery->get();
         $payments = $paymentsQuery->get();
         $advances = $advancesQuery->get();
+        $refunds = $refundsQuery->get();
 
         // 1. Dynamic Bill Allocation:
         // Respect explicit SupplierPaymentAllocation rows first, then allocate remaining unallocated payments chronologically (FIFO)
         $allPurchases = Purchase::where('supplier_id', $supplier->id)
             ->where('status', 'confirmed')
+            ->where(fn ($q) => $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided'))
             ->orderBy('purchase_date', 'asc')
             ->orderBy('id', 'asc')
             ->get();
@@ -457,21 +467,49 @@ class SupplierService
             $itemSummary = $p->items->map(fn ($it) => $it->product->name.' ('.(float) $it->purchase_quantity.' '.$it->purchase_unit.' @ ৳'.(float) $it->unit_price.')')->join(', ');
             $unpaid = (float) $p->total_amount - (float) $p->paid_amount;
             $alloc = $billAllocations[$p->id] ?? null;
+            $isVoided = ($p->reversal_status === 'voided');
 
             $rows->push([
                 'date' => $p->purchase_date->toDateString(),
                 'type' => 'purchase_bill',
                 'reference' => $p->invoice_no,
-                'description' => 'Goods Received: '.($itemSummary ?: 'Kitchen Raw Materials'),
+                'description' => ($isVoided ? '[Voided / Returned] ' : '').'Goods Received: '.($itemSummary ?: 'Kitchen Raw Materials'),
                 'bill_amount' => (float) $p->total_amount,
                 'paid_amount' => (float) $p->paid_amount,
                 'total_bill_paid' => $alloc ? $alloc['total_paid'] : (float) $p->paid_amount,
-                'remaining_bill_due' => $alloc ? $alloc['remaining_due'] : $unpaid,
-                'bill_status' => $alloc ? $alloc['status'] : ($unpaid <= 0 ? 'paid' : 'unpaid'),
+                'remaining_bill_due' => $isVoided ? 0.00 : ($alloc ? $alloc['remaining_due'] : $unpaid),
+                'bill_status' => $isVoided ? 'voided' : ($alloc ? $alloc['status'] : ($unpaid <= 0 ? 'paid' : 'unpaid')),
                 'net_effect' => $unpaid,
                 'items' => $p->items,
                 'created_at' => $p->created_at,
             ]);
+
+            // If the purchase was voided or partially returned, record the compensating credit note
+            if ($isVoided) {
+                $returnVal = (float) (StockLedger::where('reference_type', 'PurchaseVoid')
+                    ->where('reference_id', $p->id)
+                    ->selectRaw('SUM(quantity_out * unit_cost) as val')
+                    ->value('val') ?? $p->total_amount);
+
+                if ($returnVal <= 0) {
+                    $returnVal = (float) $p->total_amount;
+                }
+
+                $rows->push([
+                    'date' => $p->reversed_at ? $p->reversed_at->toDateString() : $p->purchase_date->toDateString(),
+                    'type' => 'credit_note',
+                    'reference' => 'CR-'.$p->invoice_no,
+                    'description' => 'Purchase Return & Credit Note for #'.$p->invoice_no.($p->reversal_reason ? ' ('.$p->reversal_reason.')' : ''),
+                    'bill_amount' => 0.00,
+                    'paid_amount' => 0.00,
+                    'total_bill_paid' => 0.00,
+                    'remaining_bill_due' => 0.00,
+                    'bill_status' => 'credited',
+                    'net_effect' => -((float) $returnVal),
+                    'items' => [],
+                    'created_at' => $p->reversed_at ?: $p->created_at,
+                ]);
+            }
         }
 
         foreach ($payments as $pay) {
@@ -504,6 +542,24 @@ class SupplierService
             ]);
         }
 
+        foreach ($refunds as $ref) {
+            $accName = $ref->financialAccount ? $ref->financialAccount->name : 'Cash/Bank';
+            $rows->push([
+                'date' => $ref->transaction_date->toDateString(),
+                'type' => 'refund_voucher',
+                'reference' => 'REF-'.$ref->id,
+                'description' => 'Supplier Cash/Bank Refund: '.($ref->notes ?: 'Refund into '.$accName),
+                'bill_amount' => 0.00,
+                'paid_amount' => 0.00,
+                'total_bill_paid' => 0.00,
+                'remaining_bill_due' => 0.00,
+                'bill_status' => 'refunded',
+                'net_effect' => ((float) $ref->amount),
+                'items' => [],
+                'created_at' => $ref->created_at,
+            ]);
+        }
+
         $sortedRows = $rows->sortBy(fn ($r) => $r['date'].'_'.$r['created_at'])->values();
 
         $runningBalance = (float) $supplier->opening_balance;
@@ -514,6 +570,12 @@ class SupplierService
                 ->selectRaw('SUM(total_amount - paid_amount) as net')
                 ->value('net') ?? 0.0);
 
+            $priorReturns = (float) (StockLedger::where('reference_type', 'PurchaseVoid')
+                ->whereIn('reference_id', Purchase::where('supplier_id', $supplier->id)->pluck('id'))
+                ->whereDate('transaction_date', '<', $startDate)
+                ->selectRaw('SUM(quantity_out * unit_cost) as val')
+                ->value('val') ?? 0.0);
+
             $priorPayments = (float) SupplierPayment::where('supplier_id', $supplier->id)
                 ->whereDate('payment_date', '<', $startDate)
                 ->sum('amount');
@@ -522,7 +584,12 @@ class SupplierService
                 ->whereDate('advance_date', '<', $startDate)
                 ->sum('amount');
 
-            $runningBalance = round((float) $supplier->opening_balance + $priorPurchasesNet - $priorPayments - $priorAdvances, 2);
+            $priorRefunds = (float) AccountTransaction::where('reference_type', 'SupplierRefund')
+                ->where('reference_id', $supplier->id)
+                ->whereDate('transaction_date', '<', $startDate)
+                ->sum('amount');
+
+            $runningBalance = round((float) $supplier->opening_balance + $priorPurchasesNet - $priorReturns - $priorPayments - $priorAdvances + $priorRefunds, 2);
         }
 
         $statementRows = [];

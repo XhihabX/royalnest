@@ -85,6 +85,7 @@ class PurchaseService
                 'total_amount' => $totalAmount,
                 'paid_amount' => $paidAmount,
                 'status' => 'confirmed',
+                'reversal_status' => 'active',
                 'is_purchase_and_consume' => $isPurchaseAndConsume,
                 'notes' => $purchaseData['notes'] ?? null,
                 'created_by' => $userId,
