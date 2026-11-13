@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
+import { useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Landmark, ArrowLeftRight, PlusCircle, ArrowUpRight, ArrowDownRight, CheckCircle2 } from 'lucide-vue-next';
 import { useI18n } from '@/Composables/useI18n';
@@ -12,8 +12,16 @@ const props = defineProps({
     transactions: Array,
 });
 
+const activeAccounts = computed(() => props.accounts.filter(a => a.is_active));
+
 const showTransferModal = ref(false);
 const showAdjustModal = ref(false);
+
+const toggleStatus = (account) => {
+    router.post(`/accounts/${account.id}/toggle-status`, {}, {
+        preserveScroll: true,
+    });
+};
 
 const transferForm = useForm({
     from_account_id: '',
@@ -94,10 +102,26 @@ const submitAdjust = () => {
                 v-for="acc in accounts" 
                 :key="acc.id"
                 class="bg-slate-900 border border-slate-800 rounded-2xl p-5"
+                :class="{ 'opacity-60 border-slate-800/50': !acc.is_active }"
             >
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">{{ acc.type }}</span>
-                    <Landmark class="w-4 h-4 text-amber-400" />
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">{{ acc.type }}</span>
+                        <span :class="['px-1.5 py-0.5 rounded text-[10px] font-bold uppercase', acc.is_active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400']">
+                            {{ acc.is_active ? 'Active' : 'Inactive' }}
+                        </span>
+                    </div>
+                    <button
+                        type="button"
+                        @click="toggleStatus(acc)"
+                        :class="[
+                            'text-[10px] px-2 py-0.5 rounded-lg font-bold transition cursor-pointer',
+                            acc.is_active ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                        ]"
+                        :title="acc.is_active ? 'Deactivate account' : 'Activate account'"
+                    >
+                        {{ acc.is_active ? 'Deactivate' : 'Activate' }}
+                    </button>
                 </div>
                 <h3 class="text-base font-bold text-white mb-2">{{ acc.name }}</h3>
                 <div class="text-2xl font-black font-mono text-emerald-400 mb-2">
@@ -177,7 +201,7 @@ const submitAdjust = () => {
                             class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                         >
                             <option value="" disabled>Select source account</option>
-                            <option v-for="a in accounts" :key="a.id" :value="a.id">
+                            <option v-for="a in activeAccounts" :key="a.id" :value="a.id">
                                 {{ a.name }} (Available: ৳{{ a.current_balance }})
                             </option>
                         </select>
@@ -191,7 +215,7 @@ const submitAdjust = () => {
                             class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                         >
                             <option value="" disabled>Select target account</option>
-                            <option v-for="a in accounts" :key="a.id" :value="a.id">
+                            <option v-for="a in activeAccounts" :key="a.id" :value="a.id">
                                 {{ a.name }} (Current: ৳{{ a.current_balance }})
                             </option>
                         </select>
@@ -265,7 +289,7 @@ const submitAdjust = () => {
                             class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                         >
                             <option value="" disabled>Select account</option>
-                            <option v-for="a in accounts" :key="a.id" :value="a.id">
+                            <option v-for="a in activeAccounts" :key="a.id" :value="a.id">
                                 {{ a.name }} (Current: ৳{{ a.current_balance }})
                             </option>
                         </select>

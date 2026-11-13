@@ -30,6 +30,7 @@ const props = defineProps({
     employees: Array,
     accounts: Array,
     stats: Object,
+    missingAlerts: { type: Array, default: () => [] },
     selectedDate: String,
     nextEmployeeId: String,
     filters: Object,
@@ -81,6 +82,7 @@ const empForm = useForm({
     joining_date: new Date().toISOString().split('T')[0],
     salary_type: 'monthly',
     agreed_salary: '',
+    assigned_shift: 'morning',
     held_salary_days: 3,
     held_salary_amount: 0,
     initial_advance: 0,
@@ -111,11 +113,12 @@ const viewFullImage = (url, title) => {
     showImageModal.value = true;
 };
 
-const markAttendance = (empId, st) => {
+const markAttendance = (empId, st, shift = null) => {
     router.post('/employees/attendance', {
         employee_id: empId,
         attendance_date: currentDate.value,
         status: st,
+        shift: shift,
     }, { preserveScroll: true });
 };
 
@@ -358,6 +361,60 @@ const submitEmployee = () => {
                 </div>
             </div>
 
+            <!-- Missing Attendance Shifts Alert Banner -->
+            <div v-if="missingAlerts && missingAlerts.length > 0" class="bg-amber-500/10 border border-amber-500/40 rounded-2xl p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <AlertCircle class="w-5 h-5 text-amber-400 shrink-0" />
+                        <h3 class="text-xs sm:text-sm font-bold text-amber-200">
+                            {{ missingAlerts.length }} Unmarked Staff Shifts Today ({{ currentDate }})
+                        </h3>
+                    </div>
+                    <Link href="/employees/attendance/bulk" class="text-xs font-bold text-amber-400 hover:underline">
+                        Open Bulk Attendance →
+                    </Link>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div
+                        v-for="alert in missingAlerts"
+                        :key="alert.employee_id + '-' + alert.missing_shift"
+                        class="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-2 text-xs"
+                    >
+                        <div>
+                            <span class="font-bold text-white block">{{ alert.name }}</span>
+                            <span class="text-[11px] text-amber-400 font-medium">{{ alert.shift_label }}</span>
+                            <span class="text-[10px] text-slate-500 block">{{ alert.role }}</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button
+                                type="button"
+                                @click="markAttendance(alert.employee_id, 'present', alert.missing_shift)"
+                                class="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 font-bold text-[11px] transition cursor-pointer"
+                                title="Mark Present"
+                            >
+                                Present
+                            </button>
+                            <button
+                                type="button"
+                                @click="markAttendance(alert.employee_id, 'half_day', alert.missing_shift)"
+                                class="px-2 py-1 rounded bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 font-bold text-[11px] transition cursor-pointer"
+                                title="Mark Half-Day"
+                            >
+                                Half
+                            </button>
+                            <button
+                                type="button"
+                                @click="markAttendance(alert.employee_id, 'absent', alert.missing_shift)"
+                                class="px-2 py-1 rounded bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 font-bold text-[11px] transition cursor-pointer"
+                                title="Mark Absent"
+                            >
+                                Absent
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Staff Directory Table -->
             <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
                 <div class="overflow-x-auto">
@@ -440,6 +497,14 @@ const submitEmployee = () => {
                                     </div>
                                     <span class="block text-[11px] text-slate-500 mt-1 capitalize">
                                         {{ emp.role }} • {{ emp.salary_type }}
+                                    </span>
+                                    <span :class="[
+                                        'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold mt-1',
+                                        emp.assigned_shift === 'evening' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30' :
+                                        emp.assigned_shift === 'both' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' :
+                                        'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                                    ]">
+                                        {{ emp.assigned_shift === 'evening' ? '🌙 Evening' : emp.assigned_shift === 'both' ? '🔄 Both Shifts' : '☀️ Morning' }}
                                     </span>
                                 </td>
                                 <td class="px-4 py-4 text-right">
@@ -584,8 +649,8 @@ const submitEmployee = () => {
                         </div>
                     </div>
 
-                    <!-- Department & Role -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Department, Role & Shift -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-semibold text-slate-300 mb-1.5">বিভাগ (Department) *</label>
                             <select v-model="empForm.department" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
@@ -599,6 +664,14 @@ const submitEmployee = () => {
                         <div>
                             <label class="block text-xs font-semibold text-slate-300 mb-1.5">পদবী (Role / Title) *</label>
                             <input v-model="empForm.role" type="text" required placeholder="যেমন: হেড কুক, সহকারী, ওয়েটার" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">কাজের শিফট (Shift) *</label>
+                            <select v-model="empForm.assigned_shift" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+                                <option value="morning">☀️ Morning Shift (সকালের শিফট)</option>
+                                <option value="evening">🌙 Evening / Night Shift (রাতের শিফট)</option>
+                                <option value="both">🔄 Both Shifts (উভয় শিফট)</option>
+                            </select>
                         </div>
                     </div>
 

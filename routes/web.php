@@ -56,6 +56,9 @@ Route::middleware('auth')->group(function () {
         // Daily Profit & Loss Calculator (Raw Material Usage & Real-Time P&L)
         Route::get('/calculator', [ProfitCalculatorController::class, 'index'])->name('calculator.index');
         Route::post('/calculator', [ProfitCalculatorController::class, 'store'])->name('calculator.store');
+
+        // Daily Purchases, Operating Expenses & Combined Transaction Reports
+        Route::get('/reports/transactions', [ReportController::class, 'transactions'])->name('reports.transactions');
     });
 
     // Inventory, Operations, Staff & Purchasing - Managers, Admins, Owners
@@ -112,6 +115,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/accounts', [FinancialAccountController::class, 'index'])->name('accounts.index');
         Route::post('/accounts/transfer', [FinancialAccountController::class, 'transfer'])->name('accounts.transfer');
         Route::post('/accounts/adjust', [FinancialAccountController::class, 'adjust'])->name('accounts.adjust');
+        Route::post('/accounts/{account}/toggle-status', [FinancialAccountController::class, 'toggleStatus'])->name('accounts.toggle-status');
 
         // Salary Disbursal
         Route::post('/employees/pay-salary', [EmployeeController::class, 'paySalary'])->name('employees.pay-salary');

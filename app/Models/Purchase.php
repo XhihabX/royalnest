@@ -49,4 +49,30 @@ class Purchase extends Model
     {
         return $this->hasMany(ConsumableAllocation::class);
     }
+
+    public function paymentAllocations(): HasMany
+    {
+        return $this->hasMany(SupplierPaymentAllocation::class, 'purchase_id');
+    }
+
+    public function getDueAmountAttribute(): float
+    {
+        $allocated = (float) $this->paymentAllocations()->sum('allocated_amount');
+
+        return max(0.0, round((float) $this->total_amount - (float) $this->paid_amount - $allocated, 2));
+    }
+
+    public function getPaymentStatusAttribute(): string
+    {
+        $allocated = (float) $this->paymentAllocations()->sum('allocated_amount');
+        $effectivePaid = (float) $this->paid_amount + $allocated;
+        if ($effectivePaid >= (float) $this->total_amount) {
+            return 'paid';
+        }
+        if ($effectivePaid > 0) {
+            return 'partial';
+        }
+
+        return 'due';
+    }
 }

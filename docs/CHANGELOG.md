@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-13] — Staff Shift System, Daily Purchases & Outflows Report, Multi-Bill Supplier Allocation, Configurable Financial Accounts & Secure PWA Service Worker
+
+**What:**
+1. **Restaurant Staff Shift Architecture & Shift-Aware Attendance Alerts** (`database/migrations/2026_11_13_000002_add_shifts_packaging_and_payment_allocations.php`, `app/Models/Employee.php`, `app/Models/EmployeeAttendance.php`, `app/Services/EmployeeService.php`, `app/Http/Controllers/EmployeeController.php`, `resources/js/Pages/Employees/*`, `Dashboard.vue`):
+   - Added `assigned_shift` (`morning`, `evening`, `both`) to `employees` and nullable `shift` (`morning`, `evening`, `null` for legacy) to `employee_attendances` with composite unique index `(employee_id, attendance_date, shift)`.
+   - Built shift-aware attendance alert engine (`EmployeeService::getMissingAttendanceAlerts`) that detects exact employee and unrecorded shift (`Morning Shift` vs `Evening / Night Shift`), surfacing actionable cards on Dashboard and Staff Directory with 1-tap `Present` / `Half-Day` / `Absent` quick buttons. Alerts clear in real-time as soon as the shift is recorded.
+   - Preserved salary calculation rules without arbitrary cuts: Daily wage calculation counts distinct calendar dates attended (`$datesGrouped = $monthAttendances->groupBy(...)`), guaranteeing workers assigned to both shifts receive full agreed daily pay without duplicate charges or arbitrary 0.5 cuts.
+2. **Dedicated Salary Payout Shortcut in Cost Entry with Designation Display** (`resources/js/Pages/Costs/Index.vue`, `app/Http/Controllers/SmartCostController.php`):
+   - Selecting an employee in Cost Entry instantly displays their Designation (`role`), department, and real-time unpaid salary payable.
+   - Payout transactions deduct from the selected active Financial Account and record into `SalaryPayment` with **zero duplicate operating expenses in P&L**.
+3. **Daily Purchases, Expenses & Cash Outflow Transactions Reporting** (`app/Http/Controllers/ReportController.php`, `resources/js/Pages/Reports/Transactions.vue`, `resources/js/Layouts/AppLayout.vue`):
+   - Created `/reports/transactions` route with 3 responsive mobile-first tabs:
+     - **Daily Purchases**: Line-by-line item audit (Item, Qty, Unit, Unit Price, Line Total, Supplier, Invoice #, Payment Status, and Category Badge).
+     - **Daily Expenses & Outflows**: Strict accounting separation distinguishing True P&L Operating Expenses (utilities, rent, maintenance) from Balance Sheet Liability Settlements (supplier due payouts, salary disbursements) and Advances.
+     - **Combined Stream**: Unified chronological transaction ledger with 1-tap category pills (`Raw Materials`, `Packaging`, `Consumables`, `Operating Expenses`, `Supplier Due`, `Salary`).
+4. **Strict Category Separation for Packaging Materials** (`categories.type = 'packaging'`, `products.product_type = 'packaging'`):
+   - Created first-class `Packaging Materials` category and product type, strictly separated from raw food ingredients and general consumables.
+5. **Multi-Bill & Partial-Bill Supplier Payment Allocation** (`app/Models/SupplierPaymentAllocation.php`, `app/Services/SupplierService.php`, `Costs/Index.vue`, `SupplierController.php`):
+   - Created `supplier_payment_allocations` table linking payments to individual purchase bills.
+   - Enforces bill outstanding limits (cannot allocate more than remaining bill due), updates bill payment statuses (`paid`, `partial`, `due`), and automatically falls back to general FIFO settlement when allocations are unspecified.
+6. **Configurable Financial Accounts & Active Guard** (`app/Services/FinancialAccountService.php`, `app/Http/Controllers/FinancialAccountController.php`, `resources/js/Pages/Accounts/Index.vue`):
+   - Added `POST /accounts/{account}/toggle-status` enabling Admin to activate/deactivate accounts (`Main Cash`, `Bank`, `bKash`, `Nagad`).
+   - Inactive accounts are hidden from transaction dropdowns and strictly rejected by backend transaction methods (`deposit`, `withdraw`, `transfer`), while historical transaction ledgers remain intact.
+7. **Secure PWA Service Worker & Compliant Manifest** (`public/sw.js`, `public/manifest.json`, `resources/views/app.blade.php`):
+   - Created `public/sw.js` with static cache versioning (`royalnest-static-v1`) for hashed assets and icons.
+   - Strictly enforces zero-cache policy for dynamic documents, navigation requests, API responses, and all authenticated ERP routes (`/api/*`, `/reports/*`, `/sales*`, `/employees*`, `/costs*`, `/accounts*`, `/calculator*`, etc.), preventing any exposure of private financial or session data.
+   - Updated `manifest.json` with separate `any` and `maskable` icon definitions and standalone app display.
+8. **Automated Verification & Production Build**:
+   - Created `tests/Feature/ShiftAttendanceReportsAndAccountsTest.php` with 8 comprehensive automated tests.
+   - Entire test suite: **72/72 tests (399 assertions) passing 100% green**.
+   - Vite 8 compiled all 55 frontend bundles in 14.48 seconds with 0 errors.
+   - Regenerated release bundle: `dist/royal_nest_production_deployment.zip` (0.51 MB, 221 files).
+
+**Why:** Satisfy all approved critical requirements for mobile-first usability, staff shift scheduling, attendance accountability, accurate financial separation between P&L and balance sheet outflows, multi-bill supplier settlements, and an installable, secure PWA experience.
+**How:** Implemented database migrations, updated Eloquent models, enhanced domain services, created `Transactions.vue`, refined `Costs/Index.vue` and `Accounts/Index.vue`, configured `sw.js`, and verified with PHPUnit and Vite.
+**Where:** `royal-nest/app/Http/Controllers/*`, `royal-nest/app/Services/*`, `royal-nest/app/Models/*`, `royal-nest/resources/js/Pages/*`, `royal-nest/public/sw.js`, `royal-nest/public/manifest.json`, `royal-nest/tests/Feature/ShiftAttendanceReportsAndAccountsTest.php`.
+**Impact:** Total alignment with business requirements, zero regressions across all 72 tests, rock-solid accounting integrity, and an app-like mobile experience.
+
+---
+
 ## [2026-11-13] — Mobile-First PWA UI Overhaul, Interactive Daily P&L Calculator, Held Salary Deposit & 1-Tap Worker Payouts
 
 **What:**

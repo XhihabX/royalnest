@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EmployeeAdvance;
+use App\Models\OperatingExpense;
+use App\Models\Purchase;
+use App\Models\SalaryPayment;
+use App\Models\SupplierPayment;
 use App\Services\ProfitLossService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -33,6 +38,178 @@ class ReportController extends Controller
             'startDate' => $startDate,
             'endDate' => $endDate,
             'summary' => $data,
+        ]);
+    }
+
+    /**
+     * Daily Purchases, Expenses & Cash Outflow Transactions Report.
+     * Tab 1: Daily Purchases (Item, Qty, Unit, Unit Price, Line Total, Category Badge, Supplier).
+     * Tab 2: Daily Expenses & Outflows (Strict separation: Operating Expenses vs Liability / Due Settlements vs Advances).
+     * Tab 3: Combined Filterable Stream with 1-tap category pills.
+     */
+    public function transactions(Request $request): Response
+    {
+        $mode = $request->input('mode', 'daily');
+        $date = $request->input('date', now()->toDateString());
+        $startDate = $request->input('start_date', $mode === 'range' ? Carbon::parse($date)->startOfMonth()->toDateString() : $date);
+        $endDate = $request->input('end_date', $mode === 'range' ? Carbon::parse($date)->endOfMonth()->toDateString() : $date);
+        $activeTab = $request->input('tab', 'purchases');
+        $categoryFilter = $request->input('category', 'all');
+
+        // Purchases Query
+        $purchases = Purchase::whereBetween('purchase_date', [$startDate, $endDate])
+            ->with(['supplier', 'items.product.category', 'creator', 'paymentAllocations'])
+            ->orderBy('purchase_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $purchaseLines = [];
+        foreach ($purchases as $p) {
+            foreach ($p->items as $item) {
+                $catType = $item->product?->product_type ?? $item->product?->category?->type ?? 'raw_material';
+                $catName = $item->product?->category?->name ?? 'Raw Materials';
+                $purchaseLines[] = [
+                    'purchase_id' => $p->id,
+                    'invoice_no' => $p->invoice_no,
+                    'date' => $p->purchase_date->toDateString(),
+                    'supplier_name' => $p->supplier?->name ?? 'Direct Purchase',
+                    'item_name' => $item->product?->name ?? 'Custom Item',
+                    'quantity' => (float) $item->quantity,
+                    'unit' => $item->unit,
+                    'unit_price' => (float) $item->unit_price,
+                    'line_total' => (float) $item->total_price,
+                    'bill_total' => (float) $p->total_amount,
+                    'paid_amount' => (float) $p->paid_amount,
+                    'due_amount' => (float) $p->due_amount,
+                    'category_type' => $catType,
+                    'category_name' => $catName,
+                    'payment_status' => $p->payment_status,
+                ];
+            }
+        }
+
+        // Operating Expenses (Strict P&L expense)
+        $expenses = OperatingExpense::whereBetween('expense_date', [$startDate, $endDate])
+            ->with(['financialAccount', 'creator'])
+            ->orderBy('expense_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get()
+            ->map(fn ($e) => [
+                'id' => $e->id,
+                'type' => 'operating_expense',
+                'type_label' => 'Operating Expense',
+                'is_pnl_expense' => true,
+                'date' => $e->expense_date->toDateString(),
+                'name' => $e->name,
+                'category' => $e->category,
+                'amount' => (float) $e->amount,
+                'account_name' => $e->financialAccount?->name ?? 'Cash',
+                'notes' => $e->notes,
+                'creator' => $e->creator?->name,
+            ]);
+
+        // Supplier Payments (Balance Sheet / Due Settlement - NOT P&L expense)
+        $supplierPayments = SupplierPayment::whereBetween('payment_date', [$startDate, $endDate])
+            ->with(['supplier', 'account', 'creator', 'allocations.purchase'])
+            ->orderBy('payment_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get()
+            ->map(fn ($sp) => [
+                'id' => $sp->id,
+                'type' => 'supplier_payment',
+                'type_label' => 'Supplier Due Settlement',
+                'is_pnl_expense' => false,
+                'date' => $sp->payment_date->toDateString(),
+                'name' => "Payment to {$sp->supplier?->name}",
+                'category' => 'supplier_due_settlement',
+                'amount' => (float) $sp->amount,
+                'account_name' => $sp->account?->name ?? 'Cash',
+                'notes' => $sp->notes,
+                'allocations' => $sp->allocations->map(fn ($a) => [
+                    'purchase_invoice' => $a->purchase?->invoice_no,
+                    'allocated_amount' => (float) $a->allocated_amount,
+                ]),
+                'creator' => $sp->creator?->name,
+            ]);
+
+        // Salary Payments (Payroll Liability Settlement - NOT double counted in P&L)
+        $salaryPayments = SalaryPayment::whereBetween('payment_date', [$startDate, $endDate])
+            ->with(['employee', 'account', 'creator', 'deductions'])
+            ->orderBy('payment_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get()
+            ->map(fn ($sal) => [
+                'id' => $sal->id,
+                'type' => 'salary_payment',
+                'type_label' => 'Staff Salary Payout',
+                'is_pnl_expense' => false,
+                'date' => $sal->payment_date->toDateString(),
+                'name' => "Salary Payout - {$sal->employee?->name} ({$sal->employee?->role})",
+                'category' => 'payroll_disbursal',
+                'amount' => (float) $sal->amount,
+                'account_name' => $sal->account?->name ?? 'Cash',
+                'notes' => "Month: {$sal->month_year}".($sal->notes ? " | {$sal->notes}" : ''),
+                'creator' => $sal->creator?->name,
+            ]);
+
+        // Staff Advances (Asset / Receivable - NOT P&L expense)
+        $advances = EmployeeAdvance::whereBetween('advance_date', [$startDate, $endDate])
+            ->with(['employee', 'account', 'creator'])
+            ->orderBy('advance_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get()
+            ->map(fn ($adv) => [
+                'id' => $adv->id,
+                'type' => 'advance',
+                'type_label' => 'Staff Advance',
+                'is_pnl_expense' => false,
+                'date' => $adv->advance_date->toDateString(),
+                'name' => "Advance to {$adv->employee?->name} ({$adv->voucher_no})",
+                'category' => 'employee_advance',
+                'amount' => (float) $adv->amount,
+                'account_name' => $adv->account?->name ?? 'Cash',
+                'notes' => $adv->reason,
+                'creator' => $adv->creator?->name,
+            ]);
+
+        // Combine all outflows for Tab 2 & 3
+        $allOutflows = collect([...$expenses, ...$supplierPayments, ...$salaryPayments, ...$advances])
+            ->sortByDesc('date')
+            ->values()
+            ->all();
+
+        // Calculate Totals
+        $totalPurchases = round(collect($purchaseLines)->sum('line_total'), 2);
+        $totalRawMaterials = round(collect($purchaseLines)->where('category_type', 'raw_material')->sum('line_total'), 2);
+        $totalPackaging = round(collect($purchaseLines)->where('category_type', 'packaging')->sum('line_total'), 2);
+        $totalConsumables = round(collect($purchaseLines)->whereNotIn('category_type', ['raw_material', 'packaging'])->sum('line_total'), 2);
+
+        $totalOperatingExpenses = round(collect($expenses)->sum('amount'), 2);
+        $totalSupplierPayments = round(collect($supplierPayments)->sum('amount'), 2);
+        $totalSalaryPayments = round(collect($salaryPayments)->sum('amount'), 2);
+        $totalAdvancesIssued = round(collect($advances)->sum('amount'), 2);
+        $totalCashOutflows = round($totalOperatingExpenses + $totalSupplierPayments + $totalSalaryPayments + $totalAdvancesIssued, 2);
+
+        return Inertia::render('Reports/Transactions', [
+            'mode' => $mode,
+            'selectedDate' => $date,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'activeTab' => $activeTab,
+            'categoryFilter' => $categoryFilter,
+            'purchaseLines' => $purchaseLines,
+            'allOutflows' => $allOutflows,
+            'summary' => [
+                'total_purchases' => $totalPurchases,
+                'total_raw_materials' => $totalRawMaterials,
+                'total_packaging' => $totalPackaging,
+                'total_consumables' => $totalConsumables,
+                'total_operating_expenses' => $totalOperatingExpenses,
+                'total_supplier_payments' => $totalSupplierPayments,
+                'total_salary_payments' => $totalSalaryPayments,
+                'total_advances_issued' => $totalAdvancesIssued,
+                'total_cash_outflows' => $totalCashOutflows,
+            ],
         ]);
     }
 }

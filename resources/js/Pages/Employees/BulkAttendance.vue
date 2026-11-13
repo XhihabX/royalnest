@@ -15,6 +15,7 @@ import { useI18n } from '../../Composables/useI18n';
 
 const props = defineProps({
     employees: Array,
+    missingAlerts: { type: Array, default: () => [] },
     date: String,
 });
 
@@ -29,17 +30,25 @@ const onDateChange = () => {
 };
 
 // Initialize form records
+const activeShiftFilter = ref('all'); // 'all', 'morning', 'evening'
+
 const form = useForm({
     date: props.date,
-    records: props.employees.map(emp => ({
-        employee_id: emp.id,
-        name: emp.name,
-        role: emp.role,
-        photo_url: emp.photo_url,
-        employee_id_code: emp.employee_id || ('EMP-' + emp.id),
-        status: (emp.attendances && emp.attendances.length > 0) ? emp.attendances[0].status : 'present',
-        notes: (emp.attendances && emp.attendances.length > 0) ? (emp.attendances[0].notes || '') : '',
-    })),
+    records: props.employees.map(emp => {
+        const defaultShift = emp.assigned_shift === 'evening' ? 'evening' : 'morning';
+        const existingAtt = emp.attendances?.find(a => a.shift === defaultShift) || emp.attendances?.[0];
+        return {
+            employee_id: emp.id,
+            name: emp.name,
+            role: emp.role,
+            assigned_shift: emp.assigned_shift || 'morning',
+            shift: defaultShift,
+            photo_url: emp.photo_url,
+            employee_id_code: emp.employee_id || ('EMP-' + emp.id),
+            status: existingAtt ? existingAtt.status : 'present',
+            notes: existingAtt ? (existingAtt.notes || '') : '',
+        };
+    }),
 });
 
 const markAll = (st) => {
@@ -141,6 +150,7 @@ const submitBulk = () => {
                         <tr>
                             <th class="px-5 py-3.5">Staff Member</th>
                             <th class="px-4 py-3.5">Designation</th>
+                            <th class="px-4 py-3.5 text-center">Shift</th>
                             <th class="px-4 py-3.5 text-center">Attendance Status</th>
                             <th class="px-5 py-3.5">Daily Notes / Memo</th>
                         </tr>
@@ -160,6 +170,15 @@ const submitBulk = () => {
                                 </div>
                             </td>
                             <td class="px-4 py-3.5 text-slate-400 text-xs">{{ rec.role }}</td>
+                            <td class="px-4 py-3.5 text-center">
+                                <select
+                                    v-model="rec.shift"
+                                    class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-amber-400"
+                                >
+                                    <option value="morning">☀️ Morning</option>
+                                    <option value="evening">🌙 Evening</option>
+                                </select>
+                            </td>
                             <td class="px-4 py-3.5 text-center">
                                 <div class="inline-flex rounded-lg border border-slate-800 p-0.5 bg-slate-950">
                                     <button

@@ -26,10 +26,7 @@ class HandleInertiaRequests extends Middleware
                     'role' => $request->user()->primary_role,
                 ] : null,
             ],
-            'unmarked_staff_count' => $request->user() ? \App\Models\Employee::where('status', 'active')
-                ->whereDoesntHave('attendances', function ($q) {
-                    $q->where('attendance_date', now()->toDateString());
-                })->count() : 0,
+            'unmarked_staff_count' => $request->user() ? count(app(\App\Services\EmployeeService::class)->getMissingAttendanceAlerts(now()->toDateString())) : 0,
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

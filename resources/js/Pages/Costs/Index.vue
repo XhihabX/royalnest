@@ -82,6 +82,7 @@ const form = useForm({
     save_as_template: false,
     template_id: null,
     is_favorite: false,
+    allocations: [],
 });
 
 // Sync form transaction type with active tab
@@ -200,12 +201,25 @@ const onProductSelect = () => {
     }
 };
 
+const selectedEmployeeInfo = computed(() => {
+    if (!form.employee_id) return null;
+    return props.employees.find(e => e.id === form.employee_id) || null;
+});
+
+const selectedSupplierInfo = computed(() => {
+    if (!form.supplier_id) return null;
+    return props.suppliers.find(s => s.id === form.supplier_id) || null;
+});
+
 const onEmployeeSelect = () => {
-    const emp = props.employees.find(e => e.id === form.employee_id);
+    const emp = selectedEmployeeInfo.value;
     if (emp) {
         form.name = emp.name;
         if (form.transaction_type === 'salary_payment') {
-            if (emp.salary_type === 'daily') {
+            if (emp.unpaid_payable && Number(emp.unpaid_payable) > 0) {
+                form.amount = Number(emp.unpaid_payable);
+                form.paid_amount = Number(emp.unpaid_payable);
+            } else if (emp.salary_type === 'daily') {
                 form.amount = Number(emp.agreed_salary);
                 form.paid_amount = Number(emp.agreed_salary);
             } else if (emp.salary_type === 'monthly') {
@@ -217,6 +231,36 @@ const onEmployeeSelect = () => {
         // Default to cash drawer account
         const cashAcc = props.accounts.find(a => a.type === 'cash') || props.accounts[0];
         if (cashAcc) form.payment_account_id = cashAcc.id;
+    }
+};
+
+const onSupplierSelect = () => {
+    const sup = selectedSupplierInfo.value;
+    if (sup) {
+        form.name = sup.name;
+        form.allocations = [];
+        if (Number(sup.current_balance) > 0) {
+            form.amount = Number(sup.current_balance);
+        }
+    }
+};
+
+const setBillAllocation = (purchaseId, maxDue, amount) => {
+    const val = Math.min(Number(maxDue), Math.max(0, parseFloat(amount) || 0));
+    const idx = form.allocations.findIndex(a => a.purchase_id === purchaseId);
+    if (idx >= 0) {
+        if (val > 0) {
+            form.allocations[idx].amount = val;
+        } else {
+            form.allocations.splice(idx, 1);
+        }
+    } else if (val > 0) {
+        form.allocations.push({ purchase_id: purchaseId, amount: val });
+    }
+    // Update total form amount to match sum of allocations if allocations exist
+    const sumAlloc = form.allocations.reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
+    if (sumAlloc > 0) {
+        form.amount = Number(sumAlloc.toFixed(2));
     }
 };
 
@@ -571,13 +615,30 @@ const toggleFav = (tplId) => {
                                     {{ e.name }} ({{ e.role }} • {{ e.department || 'General' }} • ৳{{ e.agreed_salary }})
                                 </option>
                             </select>
+
+                            <!-- Staff Designation & Payable Info Card -->
+                            <div v-if="selectedEmployeeInfo" class="mt-2 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <div>
+                                    <span class="text-slate-400">Designation: </span>
+                                    <span class="font-bold text-white">{{ selectedEmployeeInfo.role }}</span>
+                                    <span class="text-slate-500"> • {{ selectedEmployeeInfo.department || 'Kitchen' }}</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-slate-400">Unpaid Payable: </span>
+                                    <span class="font-bold text-amber-400 font-mono">৳{{ selectedEmployeeInfo.unpaid_payable }}</span>
+                                    <span v-if="selectedEmployeeInfo.outstanding_advance > 0" class="text-rose-400 text-[10px]">
+                                        (Adv: ৳{{ selectedEmployeeInfo.outstanding_advance }})
+                                    </span>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Supplier Selector (For Supplier Payment) -->
-                        <div v-else-if="form.transaction_type === 'supplier_payment'">
+                        <div v-else-if="form.transaction_type === 'supplier_payment'" class="col-span-full">
                             <label class="block text-slate-300 font-medium mb-1">{{ t('supplier', 'Select Supplier / Dealer') }}</label>
                             <select 
                                 v-model="form.supplier_id" 
+                                @change="onSupplierSelect"
                                 required
                                 class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
                             >
@@ -586,6 +647,34 @@ const toggleFav = (tplId) => {
                                     {{ s.name }} (Due: ৳{{ Number(s.current_balance).toFixed(2) }})
                                 </option>
                             </select>
+
+                            <!-- Multi-Bill Allocation Selector -->
+                            <div v-if="selectedSupplierInfo?.purchases?.length" class="mt-3 p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="font-bold text-slate-300">Open Purchase Bills to Settle (Optional Multi-Bill Allocation):</span>
+                                    <span class="text-slate-400">Total Due: <strong class="text-amber-400">৳{{ selectedSupplierInfo.current_balance }}</strong></span>
+                                </div>
+                                <div class="space-y-1.5 max-h-48 overflow-y-auto">
+                                    <div v-for="b in selectedSupplierInfo.purchases" :key="b.id" class="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+                                        <div>
+                                            <span class="font-bold text-white font-mono">#{{ b.invoice_no }}</span>
+                                            <span class="text-slate-400 text-[11px] ml-1.5">{{ b.purchase_date }} • Bill: ৳{{ b.total_amount }} • Remaining Due: <strong class="text-rose-400 font-mono">৳{{ b.due_amount }}</strong></span>
+                                        </div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-slate-400 text-[11px]">Pay ৳:</span>
+                                            <input
+                                                type="number"
+                                                step="any"
+                                                :max="b.due_amount"
+                                                :value="form.allocations.find(a => a.purchase_id === b.id)?.amount || ''"
+                                                @input="setBillAllocation(b.id, b.due_amount, $event.target.value)"
+                                                placeholder="0.00"
+                                                class="w-24 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white font-mono text-xs focus:border-amber-400 focus:outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Expense Category (For General Expense) -->

@@ -68,6 +68,7 @@ class EmployeeService
             'held_salary_days' => isset($data['held_salary_days']) ? (int) $data['held_salary_days'] : 0,
             'held_salary_amount' => isset($data['held_salary_amount']) ? (float) $data['held_salary_amount'] : 0.00,
             'hourly_rate' => isset($data['hourly_rate']) ? (float) $data['hourly_rate'] : null,
+            'assigned_shift' => $data['assigned_shift'] ?? 'morning',
             'status' => $data['status'] ?? 'active',
             'notes' => $data['notes'] ?? null,
             'is_active' => ($data['status'] ?? 'active') === 'active',
@@ -109,6 +110,7 @@ class EmployeeService
             'held_salary_days' => isset($data['held_salary_days']) ? (int) $data['held_salary_days'] : (int) ($employee->held_salary_days ?? 0),
             'held_salary_amount' => isset($data['held_salary_amount']) ? (float) $data['held_salary_amount'] : (float) ($employee->held_salary_amount ?? 0.00),
             'hourly_rate' => isset($data['hourly_rate']) ? (float) $data['hourly_rate'] : $employee->hourly_rate,
+            'assigned_shift' => $data['assigned_shift'] ?? $employee->assigned_shift ?? 'morning',
             'status' => $data['status'] ?? $employee->status,
             'notes' => $data['notes'] ?? null,
             'is_active' => ($data['status'] ?? $employee->status) === 'active',
@@ -128,14 +130,15 @@ class EmployeeService
     }
 
     /**
-     * Mark daily attendance for an individual employee.
+     * Mark daily attendance for an individual employee with optional shift.
      */
-    public function markAttendance(int $employeeId, string $date, string $status, ?string $notes = null): EmployeeAttendance
+    public function markAttendance(int $employeeId, string $date, string $status, ?string $notes = null, ?string $shift = null): EmployeeAttendance
     {
         return EmployeeAttendance::updateOrCreate(
             [
                 'employee_id' => $employeeId,
                 'attendance_date' => $date,
+                'shift' => $shift,
             ],
             [
                 'status' => $status,
@@ -145,7 +148,7 @@ class EmployeeService
     }
 
     /**
-     * Bulk mark attendance for all employees on a given date.
+     * Bulk mark attendance for all employees on a given date with shift support.
      */
     public function recordBulkAttendance(string $date, array $records): void
     {
@@ -155,6 +158,7 @@ class EmployeeService
                     [
                         'employee_id' => (int) $rec['employee_id'],
                         'attendance_date' => $date,
+                        'shift' => $rec['shift'] ?? null,
                     ],
                     [
                         'status' => $rec['status'],
@@ -163,6 +167,64 @@ class EmployeeService
                 );
             }
         });
+    }
+
+    /**
+     * Get missing attendance alerts for all active employees for a given date.
+     * Evaluates employee assigned_shift (morning, evening, both) and checks if recorded.
+     * Automatically clears as soon as the shift attendance is saved.
+     */
+    public function getMissingAttendanceAlerts(string $date): array
+    {
+        $activeEmployees = Employee::where('status', 'active')
+            ->with(['attendances' => fn ($q) => $q->where('attendance_date', $date)])
+            ->orderBy('name')
+            ->get();
+
+        $alerts = [];
+
+        foreach ($activeEmployees as $emp) {
+            $shiftPref = $emp->assigned_shift ?? 'morning';
+            $recordedShifts = $emp->attendances->pluck('shift')->all();
+            $hasLegacyNull = in_array(null, $recordedShifts, true);
+
+            if ($hasLegacyNull) {
+                // Legacy records with null shift satisfy attendance for the day
+                continue;
+            }
+
+            if ($shiftPref === 'morning' || $shiftPref === 'both') {
+                if (! in_array('morning', $recordedShifts, true)) {
+                    $alerts[] = [
+                        'employee_id' => $emp->id,
+                        'employee_code' => $emp->employee_id,
+                        'name' => $emp->name,
+                        'role' => $emp->role,
+                        'department' => $emp->department,
+                        'assigned_shift' => $shiftPref,
+                        'missing_shift' => 'morning',
+                        'shift_label' => 'Morning Shift',
+                    ];
+                }
+            }
+
+            if ($shiftPref === 'evening' || $shiftPref === 'both') {
+                if (! in_array('evening', $recordedShifts, true)) {
+                    $alerts[] = [
+                        'employee_id' => $emp->id,
+                        'employee_code' => $emp->employee_id,
+                        'name' => $emp->name,
+                        'role' => $emp->role,
+                        'department' => $emp->department,
+                        'assigned_shift' => $shiftPref,
+                        'missing_shift' => 'evening',
+                        'shift_label' => 'Evening / Night Shift',
+                    ];
+                }
+            }
+        }
+
+        return $alerts;
     }
 
     /**
@@ -352,9 +414,17 @@ class EmployeeService
         $agreedSalary = (float) $employee->agreed_salary;
         $accruedSalary = $agreedSalary;
 
-        // If daily wage, multiply present + 0.5 * half_day
+        // If daily wage, evaluate distinct calendar dates to preserve salary rules (no arbitrary cuts or duplicate charges)
         if ($employee->salary_type === 'daily') {
-            $effectiveDays = $presentDays + ($halfDays * 0.5);
+            $datesGrouped = $monthAttendances->groupBy(fn ($a) => $a->attendance_date->toDateString());
+            $effectiveDays = 0.0;
+            foreach ($datesGrouped as $dateStr => $dayRecords) {
+                if ($dayRecords->contains('status', 'present')) {
+                    $effectiveDays += 1.0;
+                } elseif ($dayRecords->contains('status', 'half_day')) {
+                    $effectiveDays += 0.5;
+                }
+            }
             $accruedSalary = round($effectiveDays * $agreedSalary, 2);
         }
 

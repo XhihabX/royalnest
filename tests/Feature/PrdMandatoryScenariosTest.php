@@ -93,7 +93,7 @@ class PrdMandatoryScenariosTest extends TestCase
                 quantityIn: $initialStock,
                 quantityOut: 0,
                 unitCost: $costPrice,
-                transactionDate: now()->toDateString(),
+                transactionDate: '2026-11-10',
                 userId: $this->user->id,
                 notes: 'Initial test opening stock'
             );

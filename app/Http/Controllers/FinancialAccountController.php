@@ -18,7 +18,7 @@ class FinancialAccountController extends Controller
 
     public function index(): Response
     {
-        $accounts = FinancialAccount::where('is_active', true)->get();
+        $accounts = FinancialAccount::orderBy('name')->get();
         $transactions = AccountTransaction::with(['financialAccount', 'relatedAccount', 'creator'])
             ->latest('transaction_date')
             ->latest('id')
@@ -29,6 +29,14 @@ class FinancialAccountController extends Controller
             'accounts' => $accounts,
             'transactions' => $transactions,
         ]);
+    }
+
+    public function toggleStatus(FinancialAccount $account): RedirectResponse
+    {
+        $this->accountService->toggleStatus($account->id);
+        $status = $account->fresh()->is_active ? 'activated' : 'deactivated';
+
+        return redirect()->back()->with('success', "Financial account '{$account->name}' has been {$status}.");
     }
 
     public function transfer(Request $request): RedirectResponse

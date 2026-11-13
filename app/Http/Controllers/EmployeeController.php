@@ -59,10 +59,12 @@ class EmployeeController extends Controller
             ->whereDoesntHave('attendances', fn ($q) => $q->where('attendance_date', $date))
             ->count();
 
+        $missingAlerts = $this->employeeService->getMissingAttendanceAlerts($date);
+
         $stats = [
             'total_staff' => Employee::count(),
             'active_staff' => $activeStaffCount,
-            'unmarked_today' => $unmarkedStaffCount,
+            'unmarked_today' => count($missingAlerts),
             'on_leave' => Employee::where('status', 'on_leave')->count(),
             'total_advances' => Employee::withSum('advances as total_adv', 'remaining_balance')->get()->sum('total_adv'),
         ];
@@ -73,6 +75,7 @@ class EmployeeController extends Controller
             'employees' => $employees,
             'accounts' => $accounts,
             'stats' => $stats,
+            'missingAlerts' => $missingAlerts,
             'selectedDate' => $date,
             'nextEmployeeId' => $nextEmployeeId,
             'filters' => [
@@ -109,9 +112,11 @@ class EmployeeController extends Controller
             ->with(['attendances' => fn ($q) => $q->where('attendance_date', $date)])
             ->orderBy('name')
             ->get();
+        $missingAlerts = $this->employeeService->getMissingAttendanceAlerts($date);
 
         return Inertia::render('Employees/BulkAttendance', [
             'employees' => $employees,
+            'missingAlerts' => $missingAlerts,
             'date' => $date,
         ]);
     }
@@ -126,6 +131,7 @@ class EmployeeController extends Controller
             'records' => 'required|array',
             'records.*.employee_id' => 'required|exists:employees,id',
             'records.*.status' => 'required|in:present,absent,half_day,leave',
+            'records.*.shift' => 'nullable|string|in:morning,evening',
             'records.*.notes' => 'nullable|string',
         ]);
 
@@ -135,7 +141,7 @@ class EmployeeController extends Controller
     }
 
     /**
-     * Create new employee profile with photos.
+     * Create new employee profile with photos and shift assignment.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -153,6 +159,7 @@ class EmployeeController extends Controller
             'joining_date' => 'required|date',
             'salary_type' => 'required|in:monthly,daily,hourly',
             'agreed_salary' => 'required|numeric|min:0',
+            'assigned_shift' => 'nullable|string|in:morning,evening,both',
             'held_salary_days' => 'nullable|integer|min:0|max:30',
             'held_salary_amount' => 'nullable|numeric|min:0',
             'hourly_rate' => 'nullable|numeric|min:0',
@@ -187,6 +194,7 @@ class EmployeeController extends Controller
             'joining_date' => 'required|date',
             'salary_type' => 'required|in:monthly,daily,hourly',
             'agreed_salary' => 'required|numeric|min:0',
+            'assigned_shift' => 'nullable|string|in:morning,evening,both',
             'held_salary_days' => 'nullable|integer|min:0|max:30',
             'held_salary_amount' => 'nullable|numeric|min:0',
             'hourly_rate' => 'nullable|numeric|min:0',
@@ -210,6 +218,7 @@ class EmployeeController extends Controller
             'employee_id' => 'required|exists:employees,id',
             'attendance_date' => 'required|date',
             'status' => 'required|in:present,absent,half_day,leave',
+            'shift' => 'nullable|string|in:morning,evening',
             'notes' => 'nullable|string',
         ]);
 
@@ -217,7 +226,8 @@ class EmployeeController extends Controller
             $validated['employee_id'],
             $validated['attendance_date'],
             $validated['status'],
-            $validated['notes'] ?? null
+            $validated['notes'] ?? null,
+            $validated['shift'] ?? null
         );
 
         return redirect()->back()->with('success', 'Attendance marked.');

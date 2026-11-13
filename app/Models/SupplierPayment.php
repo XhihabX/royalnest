@@ -40,4 +40,9 @@ class SupplierPayment extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
+    public function allocations()
+    {
+        return $this->hasMany(SupplierPaymentAllocation::class, 'supplier_payment_id');
+    }
 }

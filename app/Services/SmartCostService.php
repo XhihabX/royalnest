@@ -307,7 +307,8 @@ class SmartCostService
             paymentAccountId: $accountId,
             paymentMethod: 'cash',
             notes: $data['notes'] ?? 'Supplier due payment from Daily Cost Entry',
-            userId: $userId
+            userId: $userId,
+            billAllocations: $data['allocations'] ?? []
         );
 
         return [

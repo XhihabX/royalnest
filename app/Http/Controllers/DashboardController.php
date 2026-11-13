@@ -12,6 +12,7 @@ use App\Models\SalaryPayment;
 use App\Models\StockLedger;
 use App\Models\Supplier;
 use App\Models\SupplierPayment;
+use App\Services\EmployeeService;
 use App\Services\ProfitLossService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,7 +21,8 @@ use Inertia\Response;
 class DashboardController extends Controller
 {
     public function __construct(
-        protected ProfitLossService $profitLossService
+        protected ProfitLossService $profitLossService,
+        protected EmployeeService $employeeService
     ) {}
 
     public function index(Request $request): Response
@@ -52,12 +54,13 @@ class DashboardController extends Controller
         // Staff & Payroll Cross-Module Stats
         $activeStaffCount = Employee::where('status', 'active')->count();
         $todayAttendances = EmployeeAttendance::where('attendance_date', $today)->get();
+        $missingShiftAlerts = $this->employeeService->getMissingAttendanceAlerts($today);
         $attendanceSummary = [
             'present' => $todayAttendances->where('status', 'present')->count(),
             'half_day' => $todayAttendances->where('status', 'half_day')->count(),
             'absent' => $todayAttendances->where('status', 'absent')->count(),
             'leave' => $todayAttendances->where('status', 'leave')->count(),
-            'unmarked' => max(0, $activeStaffCount - $todayAttendances->count()),
+            'unmarked' => count($missingShiftAlerts),
             'total_active' => $activeStaffCount,
         ];
 
@@ -79,6 +82,7 @@ class DashboardController extends Controller
             'staffStats' => [
                 'active_count' => $activeStaffCount,
                 'attendance' => $attendanceSummary,
+                'missing_alerts' => $missingShiftAlerts,
                 'outstanding_advances' => round($totalStaffAdvances, 2),
                 'recent_payments' => $recentSalaryPayments,
             ],

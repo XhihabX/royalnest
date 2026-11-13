@@ -25,6 +25,7 @@ class Employee extends Model
         'emergency_contact',
         'address',
         'role',
+        'assigned_shift',
         'department',
         'tags',
         'joining_date',

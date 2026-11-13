@@ -199,6 +199,9 @@ class SupplierController extends Controller
             'payment_account_id' => 'nullable|exists:financial_accounts,id',
             'payment_method' => 'required|string|in:cash,bank,mfs,cheque,other',
             'notes' => 'nullable|string|max:500',
+            'allocations' => 'nullable|array',
+            'allocations.*.purchase_id' => 'required|exists:purchases,id',
+            'allocations.*.amount' => 'required|numeric|min:0.01',
         ]);
 
         $userId = auth()->id() ?? 1;
@@ -210,7 +213,8 @@ class SupplierController extends Controller
             paymentAccountId: ! empty($validated['payment_account_id']) ? (int) $validated['payment_account_id'] : null,
             paymentMethod: $validated['payment_method'],
             notes: $validated['notes'] ?? null,
-            userId: $userId
+            userId: $userId,
+            billAllocations: $validated['allocations'] ?? []
         );
 
         return redirect()->back()->with('success', "Payment voucher #{$payment->voucher_no} recorded successfully. Due updated.");

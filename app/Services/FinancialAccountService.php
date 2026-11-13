@@ -31,6 +31,11 @@ class FinancialAccountService
             $notes
         ) {
             $account = FinancialAccount::lockForUpdate()->findOrFail($accountId);
+            if (! $account->is_active) {
+                throw ValidationException::withMessages([
+                    'payment_account_id' => "Financial account '{$account->name}' is inactive and cannot receive funds.",
+                ]);
+            }
             $account->current_balance = round((float) $account->current_balance + $amount, 2);
             $account->save();
 
@@ -69,6 +74,11 @@ class FinancialAccountService
             $notes
         ) {
             $account = FinancialAccount::lockForUpdate()->findOrFail($accountId);
+            if (! $account->is_active) {
+                throw ValidationException::withMessages([
+                    'payment_account_id' => "Financial account '{$account->name}' is inactive and cannot disburse funds.",
+                ]);
+            }
             $account->current_balance = round((float) $account->current_balance - $amount, 2);
             $account->save();
 
@@ -113,6 +123,12 @@ class FinancialAccountService
             $from = FinancialAccount::lockForUpdate()->findOrFail($fromAccountId);
             $to = FinancialAccount::lockForUpdate()->findOrFail($toAccountId);
 
+            if (! $from->is_active || ! $to->is_active) {
+                throw ValidationException::withMessages([
+                    'payment_account_id' => 'Cannot execute transfer involving an inactive financial account.',
+                ]);
+            }
+
             $from->current_balance = round((float) $from->current_balance - $amount, 2);
             $from->save();
 
@@ -143,5 +159,17 @@ class FinancialAccountService
 
             return ['transfer_out' => $txnOut, 'transfer_in' => $txnIn];
         });
+    }
+
+    /**
+     * Toggle active/inactive status of a financial account.
+     */
+    public function toggleStatus(int $accountId): FinancialAccount
+    {
+        $account = FinancialAccount::findOrFail($accountId);
+        $account->is_active = ! $account->is_active;
+        $account->save();
+
+        return $account;
     }
 }

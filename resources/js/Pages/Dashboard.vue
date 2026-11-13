@@ -251,18 +251,33 @@ const onDateChange = () => {
                     <!-- Pending Attendance Warning Box -->
                     <div 
                         v-if="staffStats.attendance.unmarked > 0" 
-                        class="mb-3 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-between text-xs text-amber-200"
+                        class="mb-3 p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-xs text-amber-200 space-y-2"
                     >
-                        <div class="flex items-center space-x-2">
-                            <Clock class="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
-                            <span><strong>{{ staffStats.attendance.unmarked }} জন কর্মীর</strong> আজকের হাজিরা বাকি</span>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <Clock class="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+                                <span><strong>{{ staffStats.attendance.unmarked }} Unmarked Shift Attendance{{ staffStats.attendance.unmarked > 1 ? 's' : '' }} Today</strong></span>
+                            </div>
+                            <Link 
+                                href="/employees/attendance/bulk" 
+                                class="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[11px] transition shadow shrink-0 active:scale-95"
+                            >
+                                Record →
+                            </Link>
                         </div>
-                        <Link 
-                            href="/employees/attendance/bulk" 
-                            class="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[11px] transition shadow shrink-0 active:scale-95"
-                        >
-                            হাজিরা দিন →
-                        </Link>
+                        <div v-if="staffStats.missing_alerts?.length" class="space-y-1.5 pt-1 border-t border-amber-500/20">
+                            <div 
+                                v-for="alert in staffStats.missing_alerts.slice(0, 3)" 
+                                :key="alert.employee_id + '-' + alert.missing_shift"
+                                class="flex items-center justify-between text-[11px] bg-slate-950/60 px-2 py-1 rounded border border-amber-500/20"
+                            >
+                                <span class="text-white font-medium">{{ alert.name }} ({{ alert.role }}) — <span class="text-amber-400">{{ alert.shift_label }}</span></span>
+                                <Link href="/employees" class="text-amber-400 hover:underline font-semibold">Mark</Link>
+                            </div>
+                            <div v-if="staffStats.missing_alerts.length > 3" class="text-[10px] text-amber-300 italic text-right">
+                                +{{ staffStats.missing_alerts.length - 3 }} more pending shifts
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Attendance Pill Badges -->

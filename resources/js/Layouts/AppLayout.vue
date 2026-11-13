@@ -60,6 +60,7 @@ const navItems = computed(() => [
     { label: t('products', 'Products'), href: '/products', icon: Boxes },
     { label: t('expenses', 'Operating Costs'), href: '/expenses', icon: Receipt },
     { label: t('accounts', 'Cash & Accounts'), href: '/accounts', icon: Landmark },
+    { label: t('transactions_report', 'Daily Purchases & Expenses'), href: '/reports/transactions', icon: Receipt },
     { label: t('reports', 'Profit & Loss'), href: '/reports/profit-loss', icon: TrendingUp },
 ]);
 
@@ -80,6 +81,7 @@ const mobileFinanceItems = computed(() => [
     { label: t('suppliers', 'Suppliers & Due Ledger'), href: '/suppliers/active', icon: Store },
     { label: t('supplier_directory', 'Supplier Directory'), href: '/suppliers/directory', icon: Store },
     { label: t('expenses', 'Operating Costs'), href: '/expenses', icon: Receipt },
+    { label: t('transactions_report', 'Daily Purchases & Expenses'), href: '/reports/transactions', icon: Receipt },
     { label: t('accounts', 'Cash Drawer & Bank'), href: '/accounts', icon: Landmark },
     { label: t('reports', 'Profit & Loss Statement'), href: '/reports/profit-loss', icon: TrendingUp },
 ]);

@@ -6,6 +6,7 @@ use App\Models\Purchase;
 use App\Models\Supplier;
 use App\Models\SupplierAdvance;
 use App\Models\SupplierPayment;
+use App\Models\SupplierPaymentAllocation;
 use App\Models\SupplierProduct;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -130,7 +131,8 @@ class SupplierService
         ?int $paymentAccountId,
         string $paymentMethod = 'cash',
         ?string $notes = null,
-        int $userId = 1
+        int $userId = 1,
+        array $billAllocations = []
     ): SupplierPayment {
         if ($amount <= 0) {
             throw ValidationException::withMessages([
@@ -145,7 +147,8 @@ class SupplierService
             $paymentAccountId,
             $paymentMethod,
             $notes,
-            $userId
+            $userId,
+            $billAllocations
         ) {
             $supplier = Supplier::lockForUpdate()->findOrFail($supplierId);
 
@@ -161,6 +164,37 @@ class SupplierService
                 'notes' => $notes,
                 'created_by' => $userId,
             ]);
+
+            // Save any specific bill allocations
+            $totalAllocated = 0.00;
+            foreach ($billAllocations as $alloc) {
+                $pId = (int) ($alloc['purchase_id'] ?? 0);
+                $allocAmount = round((float) ($alloc['amount'] ?? 0), 2);
+                if ($allocAmount > 0 && $pId > 0) {
+                    $purchase = Purchase::where('supplier_id', $supplier->id)->findOrFail($pId);
+                    $alreadyPaid = (float) $purchase->paid_amount + (float) SupplierPaymentAllocation::where('purchase_id', $pId)->sum('allocated_amount');
+                    $remainingOnBill = max(0, round((float) $purchase->total_amount - $alreadyPaid, 2));
+
+                    if ($allocAmount > $remainingOnBill) {
+                        throw ValidationException::withMessages([
+                            'allocations' => "Allocated amount (৳{$allocAmount}) cannot exceed remaining unpaid bill amount (৳{$remainingOnBill}) for invoice #{$purchase->invoice_no}."
+                        ]);
+                    }
+
+                    SupplierPaymentAllocation::create([
+                        'supplier_payment_id' => $payment->id,
+                        'purchase_id' => $pId,
+                        'allocated_amount' => $allocAmount,
+                    ]);
+                    $totalAllocated += $allocAmount;
+                }
+            }
+
+            if ($totalAllocated > $amount) {
+                throw ValidationException::withMessages([
+                    'allocations' => "Total bill allocations (৳{$totalAllocated}) cannot exceed payment amount (৳{$amount})."
+                ]);
+            }
 
             // Deduct due atomically
             $supplier->decrement('current_balance', $amount);
@@ -360,21 +394,31 @@ class SupplierService
         $payments = $paymentsQuery->get();
         $advances = $advancesQuery->get();
 
-        // 1. Dynamic FIFO Bill Allocation:
-        // Allocate payments and advances against purchases chronologically to determine exact per-bill payment status
+        // 1. Dynamic Bill Allocation:
+        // Respect explicit SupplierPaymentAllocation rows first, then allocate remaining unallocated payments chronologically (FIFO)
         $allPurchases = Purchase::where('supplier_id', $supplier->id)
             ->where('status', 'confirmed')
             ->orderBy('purchase_date', 'asc')
             ->orderBy('id', 'asc')
             ->get();
 
+        $explicitAllocations = SupplierPaymentAllocation::whereHas('supplierPayment', fn ($q) => $q->where('supplier_id', $supplier->id))
+            ->selectRaw('purchase_id, SUM(allocated_amount) as total_allocated')
+            ->groupBy('purchase_id')
+            ->pluck('total_allocated', 'purchase_id');
+
+        $totalExplicitAllocated = (float) SupplierPaymentAllocation::whereHas('supplierPayment', fn ($q) => $q->where('supplier_id', $supplier->id))
+            ->sum('allocated_amount');
+
         $allPaymentsTotal = (float) SupplierPayment::where('supplier_id', $supplier->id)->sum('amount')
             + (float) SupplierAdvance::where('supplier_id', $supplier->id)->sum('amount');
 
-        $openingBalance = (float) $supplier->opening_balance;
-        $paymentPool = $allPaymentsTotal;
+        // Unallocated payments pool (general due payments + advances)
+        $paymentPool = max(0, round($allPaymentsTotal - $totalExplicitAllocated, 2));
 
-        // Opening balance due must be settled first from the payment pool before subsequent bills
+        $openingBalance = (float) $supplier->opening_balance;
+
+        // Opening balance due must be settled first from the unallocated payment pool
         if ($openingBalance > 0) {
             $allocatedToOpening = min($openingBalance, $paymentPool);
             $paymentPool = max(0, round($paymentPool - $allocatedToOpening, 2));
@@ -383,11 +427,12 @@ class SupplierService
         $billAllocations = [];
 
         foreach ($allPurchases as $p) {
-            $unpaidAtDelivery = max(0, (float) $p->total_amount - (float) $p->paid_amount);
-            $allocatedFromPool = min($unpaidAtDelivery, $paymentPool);
+            $explicit = (float) ($explicitAllocations[$p->id] ?? 0);
+            $unpaidAfterExplicit = max(0, (float) $p->total_amount - (float) $p->paid_amount - $explicit);
+            $allocatedFromPool = min($unpaidAfterExplicit, $paymentPool);
             $paymentPool = max(0, round($paymentPool - $allocatedFromPool, 2));
 
-            $totalBillPaid = round((float) $p->paid_amount + $allocatedFromPool, 2);
+            $totalBillPaid = round((float) $p->paid_amount + $explicit + $allocatedFromPool, 2);
             $remainingBillDue = max(0, round((float) $p->total_amount - $totalBillPaid, 2));
 
             $status = 'unpaid';
@@ -399,7 +444,7 @@ class SupplierService
 
             $billAllocations[$p->id] = [
                 'paid_at_delivery' => (float) $p->paid_amount,
-                'allocated_payments' => $allocatedFromPool,
+                'allocated_payments' => round($explicit + $allocatedFromPool, 2),
                 'total_paid' => $totalBillPaid,
                 'remaining_due' => $remainingBillDue,
                 'status' => $status,

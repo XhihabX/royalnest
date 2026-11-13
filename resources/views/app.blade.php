@@ -21,6 +21,15 @@
 
         @vite(['resources/js/app.js'])
         @inertiaHead
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js')
+                        .then((reg) => console.log('Royal Nest SW registered:', reg.scope))
+                        .catch((err) => console.warn('Royal Nest SW registration failed:', err));
+                });
+            }
+        </script>
     </head>
     <body class="font-sans antialiased bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
         @inertia
