@@ -104,11 +104,11 @@ class ReportController extends Controller
                 'name' => $e->payee ?: ucfirst($e->category).' Expense',
                 'category' => $e->category,
                 'amount' => (float) $e->amount,
-                'account_name' => $e->financialAccount?->name ?? 'Cash',
+                'account_name' => $e->financialAccount ? $e->financialAccount->name : 'Unlinked / Unknown',
                 'notes' => $e->notes,
                 'creator' => $e->creator?->name,
                 'reversal_status' => $e->reversal_status ?? 'active',
-                'account_type' => $e->financialAccount?->type ?? 'cash',
+                'account_type' => $e->financialAccount ? $e->financialAccount->type : 'unknown',
             ]);
 
         // Supplier Payments (Balance Sheet / Due Settlement - NOT P&L expense)
@@ -126,7 +126,7 @@ class ReportController extends Controller
                 'name' => "Payment to {$sp->supplier?->name}",
                 'category' => 'supplier_due_settlement',
                 'amount' => (float) $sp->amount,
-                'account_name' => $sp->account?->name ?? 'Cash',
+                'account_name' => $sp->account ? $sp->account->name : 'Unlinked / Unknown',
                 'notes' => $sp->notes,
                 'allocations' => $sp->allocations->map(fn ($a) => [
                     'purchase_invoice' => $a->purchase?->invoice_no,
@@ -134,7 +134,7 @@ class ReportController extends Controller
                 ]),
                 'creator' => $sp->creator?->name,
                 'reversal_status' => $sp->reversal_status ?? 'active',
-                'account_type' => $sp->account?->type ?? 'cash',
+                'account_type' => $sp->account ? $sp->account->type : 'unknown',
             ]);
 
         // Salary Payments (Payroll Liability Settlement - NOT double counted in P&L)
@@ -152,11 +152,11 @@ class ReportController extends Controller
                 'name' => "Salary Payout - {$sal->employee?->name} ({$sal->employee?->role})",
                 'category' => 'payroll_disbursal',
                 'amount' => (float) $sal->amount,
-                'account_name' => $sal->account?->name ?? 'Cash',
+                'account_name' => $sal->account ? $sal->account->name : 'Unlinked / Unknown',
                 'notes' => "Month: {$sal->month_year}".($sal->notes ? " | {$sal->notes}" : ''),
                 'creator' => $sal->creator?->name,
                 'reversal_status' => $sal->reversal_status ?? 'active',
-                'account_type' => $sal->account?->type ?? 'cash',
+                'account_type' => $sal->account ? $sal->account->type : 'unknown',
             ]);
 
         // Staff Advances (Asset / Receivable - NOT P&L expense)
@@ -174,11 +174,11 @@ class ReportController extends Controller
                 'name' => "Advance to {$adv->employee?->name} ({$adv->voucher_no})",
                 'category' => 'employee_advance',
                 'amount' => (float) $adv->amount,
-                'account_name' => $adv->account?->name ?? 'Cash',
+                'account_name' => $adv->account ? $adv->account->name : 'Unlinked / Unknown',
                 'notes' => $adv->reason,
                 'creator' => $adv->creator?->name,
                 'reversal_status' => $adv->reversal_status ?? 'active',
-                'account_type' => $adv->account?->type ?? 'cash',
+                'account_type' => $adv->account ? $adv->account->type : 'unknown',
             ]);
 
         // Combine all outflows for Tab 2 & 3
@@ -205,11 +205,12 @@ class ReportController extends Controller
         $totalAdvancesIssued = round($activeAdvances->sum('amount'), 2);
         $totalLiabilitySettlements = round($totalSupplierPayments + $totalSalaryPayments, 2);
 
-        // Account-specific outflow separation: Physical Cash Drawer vs Digital/Bank/MFS
+        // Account-specific outflow separation: Physical Cash Drawer vs Digital/Bank/MFS vs Unresolved/Unknown
         $activeOutflowsList = collect([...$activeExpenses, ...$activeSupplierPayments, ...$activeSalaryPayments, ...$activeAdvances]);
         $totalAccountOutflows = round($activeOutflowsList->sum('amount'), 2);
         $actualCashOutflows = round($activeOutflowsList->where('account_type', 'cash')->sum('amount'), 2);
-        $digitalBankOutflows = round($activeOutflowsList->where('account_type', '!=', 'cash')->sum('amount'), 2);
+        $digitalBankOutflows = round($activeOutflowsList->whereIn('account_type', ['bank', 'bkash', 'nagad'])->sum('amount'), 2);
+        $unresolvedAccountOutflows = round($activeOutflowsList->whereNotIn('account_type', ['cash', 'bank', 'bkash', 'nagad'])->sum('amount'), 2);
 
         return Inertia::render('Reports/Transactions', [
             'mode' => $mode,
@@ -233,7 +234,8 @@ class ReportController extends Controller
                 'total_account_outflows' => $totalAccountOutflows,
                 'actual_cash_outflows' => $actualCashOutflows,
                 'digital_bank_outflows' => $digitalBankOutflows,
-                'total_cash_outflows' => $totalAccountOutflows, // Backward compatibility alias
+                'unresolved_account_outflows' => $unresolvedAccountOutflows,
+                'total_cash_outflows' => $totalAccountOutflows, // Deprecated compatibility alias. Use total_account_outflows or actual_cash_outflows.
             ],
         ]);
     }

@@ -135,15 +135,15 @@ class ReversalService
             $paidAmount = (float) $purchase->paid_amount;
             $supplier = $purchase->supplier ? Supplier::lockForUpdate()->find($purchase->supplier_id) : null;
 
-            // If cash was paid immediately and this is a mistaken entry void:
-            // Neutralize the payment from the financial account
+            // If cash/account funds were disbursed and this entry is voided/returned:
+            // Neutralize the payment back into the originating account or active cash drawer
             if ($paidAmount > 0) {
-                // Find associated payment account transaction if any, or default cash account
-                $cashAccount = FinancialAccount::where('type', 'cash')->where('is_active', true)->first();
-                if ($cashAccount) {
+                $refundAmount = $hasConsumedItems ? min($paidAmount, $totalReturnedValue) : $paidAmount;
+                $targetAccountId = $purchase->payment_account_id ?: FinancialAccount::where('type', 'cash')->where('is_active', true)->value('id');
+                if ($targetAccountId && $refundAmount > 0) {
                     $this->accountService->deposit(
-                        accountId: $cashAccount->id,
-                        amount: $paidAmount,
+                        accountId: $targetAccountId,
+                        amount: $refundAmount,
                         date: now()->toDateString(),
                         referenceType: 'PurchaseVoid',
                         referenceId: $purchase->id,
@@ -152,10 +152,13 @@ class ReversalService
                 }
             }
 
-            // Reduce supplier due payable by unpaid balance
+            // Reduce supplier due payable by the returned shelf stock value
             $unpaidAmount = max(0, (float) $purchase->total_amount - $paidAmount);
             if ($supplier && $unpaidAmount > 0) {
-                $supplier->decrement('current_balance', $unpaidAmount);
+                $reduction = $hasConsumedItems ? min($unpaidAmount, $totalReturnedValue) : $unpaidAmount;
+                if ($reduction > 0) {
+                    $supplier->decrement('current_balance', $reduction);
+                }
             }
 
             // 5. Update purchase record status

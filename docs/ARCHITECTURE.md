@@ -144,9 +144,16 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
   - Prevents updates or deletes at the model level via `AccessDeniedHttpException`.
 - `ReversalService`:
   - Segregates bookkeeping voids from real-world money refunds.
-  - Implements FIFO purchase batch reversal matrix: 100% intact shelf stock unwound with compensating `purchase_return` ledger movement; partially consumed stock blocks invoice voiding and requires partial return; fully consumed stock strictly blocked from voiding.
+  - Implements FIFO purchase batch reversal matrix: 100% intact shelf stock unwound with compensating `purchase_return` ledger movement. Partially consumed stock safely blocked from full voiding; when partial return is approved (`$allowPartialReturn = true`), remaining physical shelf stock is returned via compensating `purchase_return` ledger entries, while supplier due liability is credited up to the returned shelf stock value (`$totalReturnedValue`) without erasing legitimate kitchen consumption cost. Fully consumed stock strictly blocked from voiding.
   - Voids mistaken supplier payments, salary payouts, advances, operating expenses, and daily sales by neutralizing fictitious ledger effects and restoring linked balances.
   - Records real-world supplier and employee cash/bank refunds into specified active accounts.
+- `ReportController` & Outflow Classification:
+  - Explicitly separates **Total Account Outflows** into:
+    - **Actual Physical Cash Outflows** (`actual_cash_outflows`): Outflows strictly tied to accounts of type `cash` (Cash Drawer).
+    - **Digital Bank & MFS Outflows** (`digital_bank_outflows`): Outflows tied to accounts of type `bank`, `bkash`, or `nagad`.
+    - **Unlinked / Unresolved Outflows** (`unresolved_account_outflows`): Any expense, payment, or advance missing a valid account relationship is flagged as `unknown` / `Unlinked` rather than being silently assumed as cash.
+    - **Total Account Outflows** (`total_account_outflows`): Sum of all active transaction outflows.
+    - Legacy alias `total_cash_outflows` retained as an alias to `total_account_outflows` with deprecation notices.
 
 ---
 

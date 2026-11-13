@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-13] — Edge-Case Audit: Corrective Schema Migration, Cash vs Digital Outflow Segregation & Purchase Reversal Safeguards
+
+**What:**
+1. **Corrective Nullable Migration** (`database/migrations/2026_11_13_000004_make_reversal_status_nullable.php`):
+   - Created safe corrective migration modifying `reversal_status` column across `daily_sales`, `operating_expenses`, `purchases`, `supplier_payments`, `salary_payments`, and `employee_advances` to explicitly allow `NULL` values (`varchar(30) NULL DEFAULT 'active'`).
+   - Cleanly migrated in batch 9, ensuring zero schema mismatch or runtime SQL exceptions when handling legacy transactions created before reversal tracking.
+2. **Strict Financial Account Outflow Classification & Unlinked Account Isolation** (`app/Http/Controllers/ReportController.php`, `resources/js/Pages/Reports/Transactions.vue`):
+   - Eliminated silent fallback to `'cash'` when a transaction lacks an associated financial account (`payment_account_id` is null or deleted). Missing accounts are now explicitly classified as `unknown` with display name `Unlinked / Unknown`.
+   - Broken down outflows into three transparent buckets:
+     - `actual_cash_outflows`: Physical Cash Drawer outflows only (`account_type === 'cash'`).
+     - `digital_bank_outflows`: Digital banking and MFS outflows (`account_type IN ['bank', 'bkash', 'nagad']`).
+     - `unresolved_account_outflows`: Flagged transactions with unlinked or unknown accounts, preventing silent contamination of physical cash drawer counts.
+   - Updated frontend cards with dedicated visual badges showing physical cash vs bank/MFS breakdowns and a warning alert when unlinked outflows exist.
+   - Preserved `total_cash_outflows` as a deprecated backward-compatible alias pointing to `total_account_outflows`.
+3. **Purchase Reversal Edge Cases & Partial Return with Credit Note** (`app/Services/ReversalService.php`):
+   - Hardened `ReversalService::voidPurchase` to properly handle partially consumed purchase batches when partial return is authorized (`$allowPartialReturn = true`).
+   - Automatically calculates remaining shelf stock value (`$totalReturnedValue`). Returns remaining shelf stock via compensating `purchase_return` ledger entries, while crediting supplier due payable only up to the returned shelf stock value (`min($unpaidAmount, $totalReturnedValue)`).
+   - Preserves legitimate kitchen consumption food costs in P&L for already-consumed stock while strictly blocking full voids on consumed batches.
+4. **Automated Verification Suite** (`tests/Feature/FinalProductionRefinementsTest.php`):
+   - Added automated tests for unlinked account isolation (Test 12) and partial purchase return with supplier payable recalculation (Test 13).
+   - Full test suite: **94/94 tests (499 assertions) passing 100% green**.
+   - Frontend compiled cleanly with Vite 8 (5.38s, 0 errors).
+   - Repackaged production deployment zip: `dist/royal_nest_production_deployment.zip`.
+
+**Why:** Prevent cash drawer reconciliation errors from unlinked vouchers, eliminate schema constraint failures on legacy records, and ensure mathematically sound purchase reversals when raw materials have been partially consumed.
+**How:** Implemented corrective migration, updated `ReportController` grouping logic, added credit note calculation in `ReversalService`, updated `Transactions.vue`, and added comprehensive automated tests.
+**Where:** `royal-nest/database/migrations/*`, `royal-nest/app/Http/Controllers/ReportController.php`, `royal-nest/app/Services/ReversalService.php`, `royal-nest/resources/js/Pages/Reports/Transactions.vue`, `royal-nest/tests/Feature/FinalProductionRefinementsTest.php`.
+**Impact:** 100% test pass rate (94/94), zero regressions, transparent cash reconciliation, and robust inventory integrity.
+
+---
+
 ## [2026-11-13] — Production Refinements: Bangladesh Timezone, Voided P&L Exclusion & Outflow Report Void Flags
 
 **What:**

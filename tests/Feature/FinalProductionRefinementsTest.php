@@ -521,4 +521,140 @@ class FinalProductionRefinementsTest extends TestCase
         $this->assertEquals(15.0, (float) $batch2->fresh()->remaining_quantity);
         $this->assertEquals(15.0, (float) $product->fresh()->current_stock);
     }
+
+    /**
+     * 12. Unlinked account outflows are not silently counted as cash or digital.
+     */
+    public function test_unlinked_account_outflows_are_not_silently_counted_as_cash_or_digital(): void
+    {
+        $this->actingAs($this->admin);
+
+        OperatingExpense::create([
+            'branch_id' => $this->branch->id,
+            'expense_date' => '2026-11-13',
+            'category' => 'other',
+            'payee' => 'Direct Petty Voucher',
+            'amount' => 1500.00,
+            'payment_account_id' => null, // Unlinked / external account
+            'reversal_status' => 'active',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->get('/reports/transactions?date=2026-11-13&mode=daily');
+        $response->assertOk();
+
+        $summary = $response->viewData('page')['props']['summary'];
+        $this->assertEquals(1500.00, $summary['total_account_outflows']);
+        $this->assertEquals(0.00, $summary['actual_cash_outflows']);
+        $this->assertEquals(0.00, $summary['digital_bank_outflows']);
+        $this->assertEquals(1500.00, $summary['unresolved_account_outflows']);
+    }
+
+    /**
+     * 13. Purchase partial reversal edge case returns remaining shelf stock and recalculates payables.
+     */
+    public function test_purchase_partial_reversal_edge_case_with_credit_note(): void
+    {
+        $category = Category::create([
+            'name' => 'Fresh Meat',
+            'slug' => 'fresh-meat',
+            'type' => 'raw_material',
+            'is_active' => true,
+        ]);
+
+        $supplier = Supplier::create([
+            'name' => 'Amin Meat House',
+            'company_name' => 'Amin Meat House',
+            'contact_person' => 'Amin',
+            'phone' => '01855667788',
+            'category' => 'Meat',
+            'status' => 'active',
+            'opening_balance' => 0,
+            'current_balance' => 4000.00, // ৳4000 unpaid due
+        ]);
+
+        $product = Product::create([
+            'category_id' => $category->id,
+            'supplier_id' => $supplier->id,
+            'name' => 'Beef Bone-in',
+            'product_type' => 'raw_material',
+            'base_unit' => 'kg',
+            'purchase_unit' => 'kg',
+            'current_stock' => 10.0,
+            'cost_price' => 800.00,
+            'is_active' => true,
+        ]);
+
+        ProductUnitConversion::create([
+            'product_id' => $product->id,
+            'purchase_unit' => 'kg',
+            'multiplier_to_base' => 1.0,
+        ]);
+
+        // Purchase 10 kg Beef @ ৳800 = ৳8,000 (Paid ৳4,000, Due ৳4,000)
+        $purchase = Purchase::create([
+            'supplier_id' => $supplier->id,
+            'invoice_no' => 'INV-BEEF-001',
+            'purchase_date' => '2026-11-13',
+            'total_amount' => 8000.00,
+            'paid_amount' => 4000.00,
+            'payment_account_id' => $this->cashAccount->id,
+            'status' => 'partial',
+            'reversal_status' => 'active',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $item = PurchaseItem::create([
+            'purchase_id' => $purchase->id,
+            'product_id' => $product->id,
+            'purchase_quantity' => 10.0,
+            'purchase_unit' => 'kg',
+            'base_quantity' => 10.0,
+            'base_unit_cost' => 800.00,
+            'unit_price' => 800.00,
+            'subtotal' => 8000.00,
+        ]);
+
+        $batch = StockBatch::create([
+            'purchase_item_id' => $item->id,
+            'product_id' => $product->id,
+            'batch_no' => 'BATCH-BEEF-01',
+            'received_date' => '2026-11-13',
+            'initial_quantity' => 10.0,
+            'remaining_quantity' => 10.0,
+            'unit_cost' => 800.00,
+            'is_exhausted' => false,
+        ]);
+
+        // Kitchen consumes 6 kg. Remaining shelf stock is 4 kg.
+        $this->consumptionService->recordConsumption(
+            date: '2026-11-13',
+            items: [['product_id' => $product->id, 'quantity_used' => 6.0]],
+            userId: $this->admin->id,
+            notes: 'Beef curry cooking'
+        );
+
+        $this->assertEquals(4.0, (float) $batch->fresh()->remaining_quantity);
+        $this->assertEquals(4.0, (float) $product->fresh()->current_stock);
+
+        // Attempting full void without allowPartialReturn is blocked
+        try {
+            $this->reversalService->voidPurchase($purchase, 'Cancel invoice', false);
+            $this->fail('Should have thrown ValidationException');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertStringContainsString('consumed', $e->getMessage());
+        }
+
+        // Performing partial return of remaining 4 kg with credit note
+        $result = $this->reversalService->voidPurchase($purchase, 'Return 4kg intact beef to supplier', true);
+        $this->assertTrue($result['success']);
+        $this->assertEquals(3200.00, $result['returned_value']); // 4 kg @ ৳800 = ৳3200
+
+        // Shelf stock for product is now 0 kg (deducted cleanly via StockLedger)
+        $this->assertEquals(0.0, (float) $product->fresh()->current_stock);
+        $this->assertTrue((bool) $batch->fresh()->is_exhausted);
+
+        // Supplier due was ৳4000 unpaid, reduced by returned ৳3200 = ৳800 remaining due
+        $this->assertEquals(800.00, (float) $supplier->fresh()->current_balance);
+    }
 }

@@ -239,6 +239,7 @@ const combinedItems = computed(() => {
                     <div class="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-x-2">
                         <span class="text-rose-300">Cash: ৳{{ summary.actual_cash_outflows?.toLocaleString() || 0 }}</span>
                         <span class="text-indigo-300">Bank/MFS: ৳{{ summary.digital_bank_outflows?.toLocaleString() || 0 }}</span>
+                        <span v-if="summary.unresolved_account_outflows > 0" class="text-amber-400 font-bold">Unlinked: ৳{{ summary.unresolved_account_outflows?.toLocaleString() }}</span>
                     </div>
                 </div>
             </div>
