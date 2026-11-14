@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DailySale;
 use App\Services\CashReconciliationService;
+use App\Services\DailySalesService;
 use App\Services\FinancialAccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,8 @@ class CashReconciliationController extends Controller
 {
     public function __construct(
         protected CashReconciliationService $cashReconciliationService,
-        protected FinancialAccountService $financialAccountService
+        protected FinancialAccountService $financialAccountService,
+        protected DailySalesService $dailySalesService
     ) {}
 
     public function index(Request $request): Response
@@ -48,44 +50,34 @@ class CashReconciliationController extends Controller
     }
 
     /**
-     * Import confirmed estimated cash sales into DailySale record.
+     * Import confirmed estimated cash sales into DailySale record and synchronize with financial accounts.
      */
     public function syncToSales(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'date' => 'required|date',
             'estimated_cash_sales' => 'required|numeric|min:0',
+            'confirm_overwrite' => 'nullable|boolean',
         ]);
 
         $date = $validated['date'];
         $estCash = round((float) $validated['estimated_cash_sales'], 2);
 
-        $sale = DailySale::whereDate('sales_date', $date)->first();
-
-        if ($sale) {
-            $otherSales = (float) ($sale->bkash_sales + $sale->nagad_sales + $sale->card_bank_sales + $sale->other_sales);
-            $newTotal = round($estCash + $otherSales, 2);
-
-            $sale->cash_sales = $estCash;
-            $sale->total_sales = $newTotal;
-            $sale->discrepancy_amount = 0.00;
-            $sale->notes = ($sale->notes ? $sale->notes.' | ' : '').'Cash sales synchronized from Cash Reconciliation.';
-            $sale->save();
-        } else {
-            DailySale::create([
-                'sales_date' => $date,
-                'total_sales' => $estCash,
-                'cash_sales' => $estCash,
-                'bkash_sales' => 0.00,
-                'nagad_sales' => 0.00,
-                'card_bank_sales' => 0.00,
-                'other_sales' => 0.00,
-                'discrepancy_amount' => 0.00,
-                'notes' => 'Generated from Daily Cash Reconciliation.',
-                'created_by' => auth()->id() ?: 1,
+        // Security / Accounting guard: Check reconciliation status
+        $recon = \App\Models\DailyCashReconciliation::whereDate('reconciliation_date', $date)->first();
+        if ($recon && $recon->status === 'confirmed' && ! auth()->user()?->hasRole(['manager', 'owner', 'admin'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'date' => "Daily cash reconciliation for {$date} is locked and confirmed. Only a manager or owner can synchronize sales from a confirmed reconciliation.",
             ]);
         }
 
-        return redirect()->back()->with('success', "Estimated cash sales of ৳{$estCash} synchronized with Daily Sales.");
+        $result = $this->dailySalesService->syncFromCashReconciliation(
+            date: $date,
+            estimatedCashSales: $estCash,
+            userId: auth()->id() ?: 1,
+            confirmOverwrite: (bool) ($validated['confirm_overwrite'] ?? false)
+        );
+
+        return redirect()->back()->with('success', "Estimated cash sales of ৳{$estCash} synchronized with Daily Sales and Cash Account.");
     }
 }

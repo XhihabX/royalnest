@@ -105,10 +105,11 @@ class SmartCostController extends Controller
         $packagingPurchases = 0;
         foreach ($activePurchases as $p) {
             foreach ($p->items as $item) {
+                $itemSubtotal = (float) ($item->subtotal ?? ($item->purchase_quantity * $item->unit_price));
                 if ($item->product?->product_type === 'packaging') {
-                    $packagingPurchases += (float) ($item->line_total ?? ($item->quantity * $item->unit_price));
+                    $packagingPurchases += $itemSubtotal;
                 } else {
-                    $rawMaterialPurchases += (float) ($item->line_total ?? ($item->quantity * $item->unit_price));
+                    $rawMaterialPurchases += $itemSubtotal;
                 }
             }
         }

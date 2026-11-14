@@ -71,6 +71,13 @@ class SmartCostAndCashReconciliationTest extends TestCase
             'is_active' => true,
         ]);
 
+        FinancialAccount::create([
+            'name' => 'Nagad Merchant',
+            'type' => 'nagad',
+            'current_balance' => 5000.00,
+            'is_active' => true,
+        ]);
+
         // Category
         $this->rawCategory = Category::create([
             'name' => 'Raw Materials',

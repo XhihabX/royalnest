@@ -42,9 +42,21 @@ class ConsumptionService
             }
 
             // 2. Create Consumption header
+            $normalizedItems = collect($items)
+                ->map(fn ($it) => [
+                    'product_id' => (int) $it['product_id'],
+                    'quantity_used' => round((float) $it['quantity_used'], 4),
+                ])
+                ->sortBy('product_id')
+                ->values()
+                ->toArray();
+            $payloadHash = md5(json_encode($normalizedItems));
+
             $consumption = Consumption::create([
                 'consumption_date' => $date,
                 'total_cost' => 0.00,
+                'status' => 'active',
+                'payload_hash' => $payloadHash,
                 'notes' => $notes,
                 'created_by' => $userId,
             ]);

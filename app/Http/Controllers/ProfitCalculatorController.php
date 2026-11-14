@@ -8,7 +8,9 @@ use App\Models\FinancialAccount;
 use App\Models\OperatingExpense;
 use App\Models\Product;
 use App\Models\StockBatch;
+use App\Services\ConsumptionRevisionService;
 use App\Services\ConsumptionService;
+use App\Services\DailySalesService;
 use App\Services\ProfitLossService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +22,9 @@ class ProfitCalculatorController extends Controller
 {
     public function __construct(
         protected ConsumptionService $consumptionService,
-        protected ProfitLossService $profitLossService
+        protected ConsumptionRevisionService $consumptionRevisionService,
+        protected ProfitLossService $profitLossService,
+        protected DailySalesService $dailySalesService
     ) {}
 
     /**
@@ -115,6 +119,7 @@ class ProfitCalculatorController extends Controller
     {
         $validated = $request->validate([
             'date' => 'required|date',
+            'consumption_id' => 'nullable|exists:consumptions,id',
             'sales' => 'nullable|array',
             'sales.total_sales' => 'nullable|numeric|min:0',
             'sales.cash_sales' => 'nullable|numeric|min:0',
@@ -132,17 +137,52 @@ class ProfitCalculatorController extends Controller
         $date = $validated['date'];
 
         DB::transaction(function () use ($date, $validated, $userId) {
-            // 1. Record Ingredient Consumption via FIFO if any items provided
+            // 1. Record or Revise Ingredient Consumption via FIFO if any items provided
             if (! empty($validated['items'])) {
-                $this->consumptionService->recordConsumption(
-                    date: $date,
-                    items: $validated['items'],
-                    userId: $userId,
-                    notes: $validated['notes'] ?? 'Daily P&L Calculator Usage'
-                );
+                $normalizedItems = collect($validated['items'])
+                    ->map(fn ($it) => [
+                        'product_id' => (int) $it['product_id'],
+                        'quantity_used' => round((float) $it['quantity_used'], 4),
+                    ])
+                    ->sortBy('product_id')
+                    ->values()
+                    ->toArray();
+
+                $itemsHash = md5(json_encode($normalizedItems));
+                $expectedNoteTag = "[Payload:{$itemsHash}]";
+                $notePrefix = !empty($validated['notes']) ? $validated['notes'] . ' ' : 'Daily P&L Calculator Usage ';
+                $finalNote = $notePrefix . $expectedNoteTag;
+
+                if (! empty($validated['consumption_id'])) {
+                    // Corrective revision: restore old batches and re-consume with new quantities
+                    $existingConsumption = Consumption::findOrFail($validated['consumption_id']);
+                    $this->consumptionRevisionService->reviseConsumption(
+                        existing: $existingConsumption,
+                        newItems: $validated['items'],
+                        userId: $userId,
+                        notes: $finalNote
+                    );
+                } else {
+                    // Additive / new consumption: check payload hash to prevent duplicate submission
+                    $alreadyExecuted = Consumption::whereDate('consumption_date', $date)
+                        ->where(function ($q) use ($expectedNoteTag, $itemsHash) {
+                            $q->where('notes', 'like', "%{$expectedNoteTag}%")
+                                ->orWhere('payload_hash', $itemsHash);
+                        })
+                        ->exists();
+
+                    if (! $alreadyExecuted) {
+                        $this->consumptionService->recordConsumption(
+                            date: $date,
+                            items: $validated['items'],
+                            userId: $userId,
+                            notes: $finalNote
+                        );
+                    }
+                }
             }
 
-            // 2. Update or Create Daily Sale if sales provided
+            // 2. Authoritative Daily Sale persistence and account synchronization via DailySalesService
             if (! empty($validated['sales'])) {
                 $salesData = $validated['sales'];
                 $totalSales = (float) ($salesData['total_sales'] ?? 0);
@@ -152,26 +192,17 @@ class ProfitCalculatorController extends Controller
                 $cardSales = (float) ($salesData['card_bank_sales'] ?? 0);
                 $otherSales = (float) ($salesData['other_sales'] ?? 0);
 
-                // If breakdown sums differ from total sales, auto-reconcile or preserve breakdown
-                $breakdownSum = round($cashSales + $bkashSales + $nagadSales + $cardSales + $otherSales, 2);
-                if ($totalSales <= 0 && $breakdownSum > 0) {
-                    $totalSales = $breakdownSum;
-                }
-
-                DailySale::updateOrCreate(
-                    ['sales_date' => $date],
-                    [
-                        'total_sales' => $totalSales,
-                        'cash_sales' => $cashSales,
-                        'bkash_sales' => $bkashSales,
-                        'nagad_sales' => $nagadSales,
-                        'card_bank_sales' => $cardSales,
-                        'other_sales' => $otherSales,
-                        'discrepancy_amount' => 0.00,
-                        'notes' => 'Saved via Daily P&L Calculator',
-                        'created_by' => $userId,
-                    ]
-                );
+                $this->dailySalesService->recordDailySale([
+                    'sales_date' => $date,
+                    'total_sales' => $totalSales,
+                    'cash_sales' => $cashSales,
+                    'bkash_sales' => $bkashSales,
+                    'nagad_sales' => $nagadSales,
+                    'card_bank_sales' => $cardSales,
+                    'other_sales' => $otherSales,
+                    'notes' => 'Saved via Daily P&L Calculator',
+                    'source' => 'calculator',
+                ], $userId);
             }
         });
 

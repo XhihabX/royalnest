@@ -78,7 +78,7 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
    - `stock_batches`: Discrete purchase lots (`batch_no`, `received_date`, `initial_quantity`, `remaining_quantity`, `unit_cost`, `is_exhausted`).
    - `purchases` & `purchase_items`: Confirmed stock receipts and direct Purchase & Consume transactions with reversal tracking (`reversal_status`, `reversal_type`, `reversed_at`, `reversed_by`, `reversal_reason`).
    - `stock_ledger`: Immutable chronological movement log (`opening_stock`, `purchase_receipt`, `consumption`, `wastage`, `adjustment_in`, `adjustment_out`, `purchase_return`) linked to specific `stock_batch_id`.
-   - `consumptions` & `consumption_items`: Daily ingredient actual usage records linked to specific `stock_batch_id`.
+   - `consumptions` & `consumption_items`: Daily ingredient actual usage records linked to specific `stock_batch_id`, with revision tracking (`status`, `revised_by_id`, `revised_at`, `payload_hash`).
    - `consumable_allocations`: Multi-day consumable amortized allocation schedules.
    - `wastages`: Spoilage, burnt, or expired item records with reasons.
    - `stock_counts` & `stock_count_items`: Physical count vs system balance with discrepancy tracking.
@@ -86,7 +86,7 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
    - `daily_sales`: Total gross sales with breakdown into Cash, bKash, Nagad, Card/Bank, Other, and discrepancy amount, with reversal tracking.
    - `operating_expenses`: Daily operating costs (electricity, gas, water, rent, transport, repairs, cleaning, marketing, other), with reversal tracking.
    - `financial_accounts`: Accounts tracking Cash Drawer, Bank, bKash, Nagad, and custom accounts with active/inactive status toggles.
-   - `account_transactions`: Deposits, withdrawals, and internal transfers (`transfer_in`, `transfer_out`).
+   - `account_transactions`: Immutable double-entry ledger tracking deposits, withdrawals, and internal transfers (`transfer_in`, `transfer_out`) with comprehensive reversal and compensating audit trail metadata (`reversal_status`, `reversal_of_id`, `reversed_at`, `reversed_by`, `reversal_reason`, `compensating_transaction_id`). Historical records are never hard-deleted.
 6. **Staff, Attendance & Payroll**:
    - `employees`: Staff records with auto-generated `employee_id`, `name`, `phone`, `alternative_phone`, `nid_number`, `photo_path`, `nid_photo_path`, `role`, `department`, `tags`, `assigned_shift` (`morning`, `evening`, `both`), `salary_type` (`monthly`, `daily`, `hourly`), `agreed_salary`, `held_salary_days`, `held_salary_amount`, `status`, soft-deletes (`deleted_at`).
    - `employee_attendances`: Shift-aware attendance records (`shift`: `morning`, `evening`, `null`) with unique constraint on `(employee_id, attendance_date, shift)`.
@@ -127,9 +127,13 @@ Royal Nest Café & Restaurant is a dedicated financial and inventory management 
 - `Wastage & Stock Count Synchronization`:
   - `WastageController` sequentially traverses and depletes active FIFO batches, computing true weighted average wastage cost across multiple purchase lots.
   - `StockCountController` synchronizes physical counts with FIFO batches: surplus creates an `ADJUSTMENT-COUNT-` batch, and deficit chronologically depletes oldest active batches.
-- `DailySalesController` (Multi-Account Cash Intake):
-  - Automatically deposits reconciled daily revenue into active financial accounts (`cash` $\rightarrow$ Cash Drawer, `bkash` $\rightarrow$ bKash, `nagad` $\rightarrow$ Nagad, `bank` $\rightarrow$ Bank).
-  - Uses idempotent transaction reconciliation to allow safe edits/re-submissions without double-counting.
+- `DailySalesService` (Canonical Sales & Financial Ledger Engine):
+  - Authoritative service for DailySale record creation, updates, and atomic reconciliation with financial accounts.
+  - Enforces Strict Channel Isolation: Cash, bKash, Nagad, and Bank NEVER fall back to cash. Transactions are rejected if the corresponding active account does not exist (only `other` can fall back to cash).
+  - Enforces Immutable Financial Ledger: Updates to DailySale do not delete previous `AccountTransaction` records. Instead, compensating entries are created with `reversal_status = 'compensating'`, and originals are marked `'reversed'`.
+- `ConsumptionRevisionService` (Perpetual Inventory Reversion & Correction):
+  - Safely handles kitchen ingredient consumption revisions.
+  - Traverses existing `consumption_items`, re-credits `remaining_quantity` to historical FIFO `stock_batches`, creates offsetting `adjustment_in` ledger entries, and re-consumes revised quantities via FIFO without orphaned stock deductions.
 - `FinancialAccountService`:
   - Records deposits, withdrawals, and profit-neutral account-to-account transfers.
 - `ProfitLossService`:

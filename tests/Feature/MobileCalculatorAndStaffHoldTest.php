@@ -53,6 +53,14 @@ class MobileCalculatorAndStaffHoldTest extends TestCase
             'is_active' => true,
         ]);
 
+        FinancialAccount::create([
+            'name' => 'bKash Merchant',
+            'type' => 'bkash',
+            'current_balance' => 10000.00,
+            'branch_id' => $this->branch->id,
+            'is_active' => true,
+        ]);
+
         $this->employeeService = app(EmployeeService::class);
         $this->stockLedgerService = app(StockLedgerService::class);
     }

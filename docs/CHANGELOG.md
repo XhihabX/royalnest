@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-11-14] — Phase 1.1: Immutable Financial Ledger, Calculator Consumption Revision & Strict Channel Isolation
+
+**What:**
+1. **Immutable Financial Ledger (`account_transactions`)** (`database/migrations/2026_11_14_000001_add_reversal_columns_to_account_transactions.php`, `app/Models/AccountTransaction.php`, `app/Services/DailySalesService.php`):
+   - Added schema columns `reversal_status`, `reversal_of_id`, `reversed_at`, `reversed_by`, `reversal_reason`, and `compensating_transaction_id` with self-referential foreign keys.
+   - Completely eliminated physical hard-deletion (`$txn->delete()`) during DailySale updates.
+   - Replaced with explicit compensating reversal transactions (`type` inverse, `reversal_status = 'compensating'`) while marking original transactions as `reversed`.
+   - Maintains 100% immutable audit history of all ledger entries with zero account balance drift across repeated edits.
+2. **Calculator Consumption Revision Engine** (`database/migrations/2026_11_14_000002_add_revision_columns_to_consumptions.php`, `app/Models/Consumption.php`, `app/Services/ConsumptionRevisionService.php`, `app/Http/Controllers/ProfitCalculatorController.php`):
+   - Created `ConsumptionRevisionService::reviseConsumption()` to safely handle corrections to kitchen raw material usage.
+   - Restores exact depleted quantities back to historical FIFO `stock_batches` and logs offsetting `adjustment_in` movements to `stock_ledger`.
+   - Re-applies FIFO consumption for the corrected quantity, preventing double-deductions (e.g. 10 kg corrected to 12 kg deducts a net 12 kg, not 22 kg).
+   - Injected into `ProfitCalculatorController::store` supporting both additive submissions and corrective revisions via `consumption_id`.
+3. **Strict Payment Channel Isolation (Zero Fallback)** (`app/Services/DailySalesService.php`, `app/Http/Controllers/ProfitCalculatorController.php`, `app/Http/Controllers/CashReconciliationController.php`):
+   - Eliminated all automatic fallback from digital MFS channels (`bkash`, `nagad`) and bank accounts to cash drawer.
+   - Any transaction with non-zero bKash, Nagad, or Bank sales strictly requires an active financial account of that type, failing with a `ValidationException` otherwise.
+   - Only `other` channel retains fallback to cash if no dedicated `other` account exists.
+4. **Comprehensive Automated Regression Suite** (`tests/Feature/Phase1ImmutableLedgerAndConsumptionRevisionTest.php`):
+   - Added 8 dedicated feature tests covering:
+     - Preservation of original `AccountTransaction` rows without hard deletion.
+     - Compensating reversal rows referencing originals via `reversal_of_id`.
+     - Repeated successive sales corrections without account balance drift.
+     - Consumption quantity increase revision adjusting stock accurately.
+     - Consumption quantity reduction revision restoring FIFO batches.
+     - Missing bKash account blocking both manual and calculator sales without silent fallback.
+     - Zero-value sales channels producing zero empty ledger rows.
+   - Entire application test suite: **128/128 tests (667 assertions) passing 100% green**.
+   - Production frontend compiled cleanly with Vite 8 (13.92s, 0 errors).
+
+**Why:** Fulfill the Phase 1.1 architectural mandate to guarantee accounting immutability, prevent inventory discrepancies from usage revisions, and enforce strict financial channel segregation.
+**How:** Created migrations for reversal metadata, implemented `ConsumptionRevisionService`, refactored `DailySalesService`, updated `ProfitCalculatorController` and `CashReconciliationController`, and wrote comprehensive regression tests.
+**Where:** `royal-nest/database/migrations/*`, `royal-nest/app/Models/*`, `royal-nest/app/Services/*`, `royal-nest/app/Http/Controllers/*`, `royal-nest/tests/Feature/*`, `royal-nest/docs/*`.
+**Impact:** 100% test pass rate (128/128), zero regressions, permanent financial audit trails, and mathematically sound FIFO batch reversals.
+
+---
+
 ## [2026-11-13] — Verification Audit: Credit Settlement Pool in Statements & Refund Idempotency
 
 **What:**

@@ -14,6 +14,12 @@ class AccountTransaction extends Model
         'financial_account_id',
         'transaction_date',
         'type',
+        'reversal_status',
+        'reversal_of_id',
+        'reversed_at',
+        'reversed_by',
+        'reversal_reason',
+        'compensating_transaction_id',
         'amount',
         'related_account_id',
         'reference_type',
@@ -25,6 +31,7 @@ class AccountTransaction extends Model
     protected $casts = [
         'transaction_date' => 'date:Y-m-d',
         'amount' => 'decimal:2',
+        'reversed_at' => 'datetime',
     ];
 
     public function financialAccount(): BelongsTo
@@ -40,5 +47,20 @@ class AccountTransaction extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function reversedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reversed_by');
+    }
+
+    public function reversalOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reversal_of_id');
+    }
+
+    public function compensatingTransaction(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'compensating_transaction_id');
     }
 }
