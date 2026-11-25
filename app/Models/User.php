@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class User extends Authenticatable
 {
@@ -57,20 +58,20 @@ class User extends Authenticatable
     {
         static::deleting(function (User $user) {
             if ($user->isSuperAdmin()) {
-                throw new \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException(
+                throw new AccessDeniedHttpException(
                     'The Primary Super Admin account cannot be deleted.'
                 );
             }
         });
 
         static::updating(function (User $user) {
-            if ($user->getOriginal('is_super_admin') && !$user->is_super_admin) {
-                throw new \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException(
+            if ($user->getOriginal('is_super_admin') && ! $user->is_super_admin) {
+                throw new AccessDeniedHttpException(
                     'The Super Admin identity privilege cannot be stripped.'
                 );
             }
-            if ($user->getOriginal('is_super_admin') && !$user->is_active) {
-                throw new \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException(
+            if ($user->getOriginal('is_super_admin') && ! $user->is_active) {
+                throw new AccessDeniedHttpException(
                     'The Primary Super Admin account cannot be deactivated.'
                 );
             }
@@ -100,7 +101,7 @@ class User extends Authenticatable
             return true;
         }
 
-        if (in_array($this->primary_role, ['owner', 'admin']) && !in_array('visitor', $roleList)) {
+        if (in_array($this->primary_role, ['owner', 'admin']) && ! in_array('visitor', $roleList)) {
             return true;
         }
 

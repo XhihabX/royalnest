@@ -3,12 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\AccountTransaction;
+use App\Models\Branch;
 use App\Models\Category;
 use App\Models\Consumption;
 use App\Models\DailySale;
 use App\Models\FinancialAccount;
 use App\Models\Product;
-use App\Models\StockBatch;
 use App\Models\User;
 use App\Services\DailySalesService;
 use App\Services\StockLedgerService;
@@ -21,15 +21,18 @@ class Phase1ImmutableLedgerAndConsumptionRevisionTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected FinancialAccount $cashAccount;
+
     protected FinancialAccount $bkashAccount;
+
     protected FinancialAccount $bankAccount;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        \App\Models\Branch::firstOrCreate(['id' => 1], [
+        Branch::firstOrCreate(['id' => 1], [
             'name' => 'Main Branch',
             'code' => 'MAIN',
             'currency' => 'BDT',
@@ -360,4 +363,3 @@ class Phase1ImmutableLedgerAndConsumptionRevisionTest extends TestCase
         $this->assertEquals($this->cashAccount->id, $txns->first()->financial_account_id);
     }
 }
-

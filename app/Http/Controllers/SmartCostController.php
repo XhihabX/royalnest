@@ -3,13 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Consumption;
+use App\Models\DailySale;
 use App\Models\Employee;
+use App\Models\EmployeeAdvance;
 use App\Models\FinancialAccount;
 use App\Models\OperatingExpense;
 use App\Models\Product;
 use App\Models\Purchase;
+use App\Models\SalaryPayment;
 use App\Models\SavedCostTemplate;
 use App\Models\Supplier;
+use App\Models\SupplierPayment;
 use App\Services\SmartCostService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,15 +41,27 @@ class SmartCostController extends Controller
             ->get();
 
         $categories = Category::where('is_active', true)->orderBy('name')->get();
-        $suppliers = Supplier::where('is_active', true)
+        $suppliers = Supplier::where(fn ($q) => $q->where('is_active', true)->orWhere('status', 'active'))
             ->with([
                 'products',
-                'purchases' => fn ($q) => $q->where('payment_status', '!=', 'paid')->orderBy('purchase_date', 'asc'),
+                'purchases' => fn ($q) => $q->where(fn ($sq) => $sq->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided'))
+                    ->where('status', '!=', 'cancelled')
+                    ->whereRaw('paid_amount < total_amount')
+                    ->with('paymentAllocations')
+                    ->orderBy('purchase_date', 'asc'),
             ])
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function ($supplier) {
+                $supplier->setRelation(
+                    'purchases',
+                    $supplier->purchases->filter(fn ($p) => $p->due_amount > 0)->values()
+                );
 
-        $employees = Employee::where('is_active', true)
+                return $supplier;
+            });
+
+        $employees = Employee::where(fn ($q) => $q->where('is_active', true)->orWhere('status', 'active'))
             ->with(['salaryPayments', 'attendances', 'advances'])
             ->orderBy('name')
             ->get()
@@ -97,7 +114,7 @@ class SmartCostController extends Controller
 
         // Instant Daily Summary Calculation for the Selected Date
         $activePurchases = Purchase::whereDate('purchase_date', $date)
-            ->where('reversal_status', '!=', 'voided')
+            ->where(fn ($q) => $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided'))
             ->with(['items.product'])
             ->get();
 
@@ -115,26 +132,26 @@ class SmartCostController extends Controller
         }
 
         $operatingExpenses = (float) OperatingExpense::whereDate('expense_date', $date)
-            ->where('reversal_status', '!=', 'voided')
+            ->where(fn ($q) => $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided'))
             ->sum('amount');
 
-        $supplierPayouts = (float) \App\Models\SupplierPayment::whereDate('payment_date', $date)
-            ->where('reversal_status', '!=', 'voided')
+        $supplierPayouts = (float) SupplierPayment::whereDate('payment_date', $date)
+            ->where(fn ($q) => $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided'))
             ->sum('amount');
 
-        $salaryPayouts = (float) \App\Models\SalaryPayment::whereDate('payment_date', $date)
-            ->where('reversal_status', '!=', 'voided')
+        $salaryPayouts = (float) SalaryPayment::whereDate('payment_date', $date)
+            ->where(fn ($q) => $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided'))
             ->sum('amount');
 
-        $advancePayouts = (float) \App\Models\EmployeeAdvance::whereDate('advance_date', $date)
-            ->where('reversal_status', '!=', 'voided')
+        $advancePayouts = (float) EmployeeAdvance::whereDate('advance_date', $date)
+            ->where(fn ($q) => $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided'))
             ->sum('amount');
 
-        $dailySale = \App\Models\DailySale::whereDate('sales_date', $date)
-            ->where('reversal_status', '!=', 'voided')
+        $dailySale = DailySale::whereDate('sales_date', $date)
+            ->where(fn ($q) => $q->whereNull('reversal_status')->orWhere('reversal_status', '!=', 'voided'))
             ->first();
 
-        $dailyCogs = (float) \App\Models\Consumption::whereDate('consumption_date', $date)->sum('total_cost');
+        $dailyCogs = (float) Consumption::whereDate('consumption_date', $date)->sum('total_cost');
 
         $dailySummary = [
             'date' => $date,

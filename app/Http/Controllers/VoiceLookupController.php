@@ -103,4 +103,3 @@ class VoiceLookupController extends Controller
         ]);
     }
 }
-

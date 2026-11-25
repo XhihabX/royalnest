@@ -21,8 +21,11 @@ class Phase1DailySalesAndSmartCostIntegrityTest extends TestCase
     use RefreshDatabase;
 
     protected User $manager;
+
     protected FinancialAccount $cashAccount;
+
     protected FinancialAccount $bkashAccount;
+
     protected FinancialAccount $bankAccount;
 
     protected function setUp(): void
@@ -336,5 +339,48 @@ class Phase1DailySalesAndSmartCostIntegrityTest extends TestCase
         // Check dailySummary prop passed to Inertia view
         $summary = $response->viewData('page')['props']['dailySummary'];
         $this->assertEquals(5500.00, (float) $summary['raw_material_purchases']);
+    }
+
+    public function test_daily_costs_index_loads_supplier_purchases_without_payment_status_column_error(): void
+    {
+        $this->actingAs($this->manager);
+
+        $supplier = Supplier::create([
+            'name' => 'Vegetable Supplier Hub',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        // Create a partially paid purchase and a fully paid purchase
+        $duePurchase = Purchase::create([
+            'supplier_id' => $supplier->id,
+            'purchase_date' => now()->toDateString(),
+            'total_amount' => 3000.00,
+            'paid_amount' => 1000.00,
+            'status' => 'confirmed',
+            'reversal_status' => null,
+            'created_by' => $this->manager->id,
+        ]);
+
+        $paidPurchase = Purchase::create([
+            'supplier_id' => $supplier->id,
+            'purchase_date' => now()->toDateString(),
+            'total_amount' => 2000.00,
+            'paid_amount' => 2000.00,
+            'status' => 'confirmed',
+            'reversal_status' => null,
+            'created_by' => $this->manager->id,
+        ]);
+
+        $response = $this->get(route('daily-costs.index'));
+        $response->assertOk();
+
+        $suppliers = $response->viewData('page')['props']['suppliers'];
+        $matching = collect($suppliers)->firstWhere('id', $supplier->id);
+        $this->assertNotNull($matching);
+
+        // Only the due purchase should be returned in supplier unsettled purchases
+        $this->assertCount(1, $matching['purchases']);
+        $this->assertEquals($duePurchase->id, $matching['purchases'][0]['id']);
     }
 }

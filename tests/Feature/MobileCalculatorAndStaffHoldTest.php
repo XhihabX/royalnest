@@ -12,7 +12,6 @@ use App\Models\FinancialAccount;
 use App\Models\Product;
 use App\Models\SalaryPayment;
 use App\Models\StockBatch;
-use App\Models\Supplier;
 use App\Models\User;
 use App\Services\EmployeeService;
 use App\Services\StockLedgerService;
@@ -24,9 +23,13 @@ class MobileCalculatorAndStaffHoldTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected Branch $branch;
+
     protected FinancialAccount $cashDrawer;
+
     protected EmployeeService $employeeService;
+
     protected StockLedgerService $stockLedgerService;
 
     protected function setUp(): void
@@ -391,4 +394,3 @@ class MobileCalculatorAndStaffHoldTest extends TestCase
         $this->assertEquals(1000.00, (float) $advance->remaining_balance);
     }
 }
-

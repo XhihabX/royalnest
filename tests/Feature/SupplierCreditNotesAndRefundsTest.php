@@ -7,12 +7,10 @@ use App\Models\FinancialAccount;
 use App\Models\Product;
 use App\Models\ProductUnitConversion;
 use App\Models\Purchase;
-use App\Models\PurchaseItem;
 use App\Models\StockBatch;
-use App\Models\StockLedger;
 use App\Models\Supplier;
-use App\Models\Wastage;
 use App\Models\User;
+use App\Models\Wastage;
 use App\Services\ConsumptionService;
 use App\Services\FinancialAccountService;
 use App\Services\ProfitLossService;
@@ -29,13 +27,21 @@ class SupplierCreditNotesAndRefundsTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected FinancialAccount $cashAccount;
+
     protected FinancialAccount $bankAccount;
+
     protected FinancialAccount $bkashAccount;
+
     protected ReversalService $reversalService;
+
     protected SupplierService $supplierService;
+
     protected PurchaseService $purchaseService;
+
     protected ConsumptionService $consumptionService;
+
     protected ProfitLossService $profitLossService;
 
     protected function setUp(): void

@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductUnitConversion;
 use App\Models\Supplier;
+use App\Services\AuditLogger;
 use App\Services\StockLedgerService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -123,14 +124,14 @@ class ProductController extends Controller
             'is_active' => $validated['is_active'] ?? true,
         ]);
 
-        if (!empty($validated['conversion_multiplier'])) {
+        if (! empty($validated['conversion_multiplier'])) {
             ProductUnitConversion::updateOrCreate(
                 ['product_id' => $product->id, 'purchase_unit' => $validated['purchase_unit']],
                 ['multiplier_to_base' => $validated['conversion_multiplier']]
             );
         }
 
-        \App\Services\AuditLogger::log(
+        AuditLogger::log(
             action: 'updated',
             description: "Updated product '{$product->name}'",
             entity: $product,
@@ -147,7 +148,7 @@ class ProductController extends Controller
         $name = $product->name;
         $product->delete();
 
-        \App\Services\AuditLogger::log(
+        AuditLogger::log(
             action: 'deleted',
             description: "Soft deleted product '{$name}' to Recycle Bin",
             entity: $product,

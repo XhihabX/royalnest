@@ -39,7 +39,7 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category): RedirectResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:100|unique:categories,name,' . $category->id,
+            'name' => 'required|string|max:100|unique:categories,name,'.$category->id,
             'type' => 'required|string|in:raw_material,packaging,consumable,other_stock',
             'description' => 'nullable|string|max:255',
             'is_active' => 'boolean',
@@ -82,4 +82,3 @@ class CategoryController extends Controller
         return back()->with('success', "Category '{$name}' moved to Recycle Bin.");
     }
 }
-

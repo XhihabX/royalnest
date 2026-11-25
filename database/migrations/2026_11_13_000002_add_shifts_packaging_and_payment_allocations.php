@@ -35,7 +35,7 @@ return new class extends Migration
         });
 
         $existingPkg = DB::table('categories')->where('slug', 'packaging-materials')->first();
-        if (!$existingPkg) {
+        if (! $existingPkg) {
             DB::table('categories')->insert([
                 'slug' => 'packaging-materials',
                 'name' => 'Packaging Materials',

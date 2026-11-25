@@ -37,6 +37,11 @@ class Purchase extends Model
         'reversed_at' => 'datetime',
     ];
 
+    protected $appends = [
+        'due_amount',
+        'payment_status',
+    ];
+
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
@@ -64,14 +69,18 @@ class Purchase extends Model
 
     public function getDueAmountAttribute(): float
     {
-        $allocated = (float) $this->paymentAllocations()->sum('allocated_amount');
+        $allocated = $this->relationLoaded('paymentAllocations')
+            ? (float) $this->paymentAllocations->sum('allocated_amount')
+            : (float) $this->paymentAllocations()->sum('allocated_amount');
 
         return max(0.0, round((float) $this->total_amount - (float) $this->paid_amount - $allocated, 2));
     }
 
     public function getPaymentStatusAttribute(): string
     {
-        $allocated = (float) $this->paymentAllocations()->sum('allocated_amount');
+        $allocated = $this->relationLoaded('paymentAllocations')
+            ? (float) $this->paymentAllocations->sum('allocated_amount')
+            : (float) $this->paymentAllocations()->sum('allocated_amount');
         $effectivePaid = (float) $this->paid_amount + $allocated;
         if ($effectivePaid >= (float) $this->total_amount) {
             return 'paid';

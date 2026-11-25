@@ -5,10 +5,8 @@ namespace Tests\Feature;
 use App\Models\Branch;
 use App\Models\Category;
 use App\Models\Consumption;
-use App\Models\ConsumptionItem;
 use App\Models\DailySale;
 use App\Models\Employee;
-use App\Models\EmployeeAdvance;
 use App\Models\FinancialAccount;
 use App\Models\OperatingExpense;
 use App\Models\Product;
@@ -21,12 +19,12 @@ use App\Models\Supplier;
 use App\Models\SupplierPayment;
 use App\Models\User;
 use App\Services\ConsumptionService;
-use App\Services\FinancialAccountService;
 use App\Services\ProfitLossService;
 use App\Services\ReversalService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class FinalProductionRefinementsTest extends TestCase
@@ -34,10 +32,15 @@ class FinalProductionRefinementsTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected Branch $branch;
+
     protected FinancialAccount $cashAccount;
+
     protected ProfitLossService $profitLossService;
+
     protected ReversalService $reversalService;
+
     protected ConsumptionService $consumptionService;
 
     protected function setUp(): void
@@ -509,7 +512,7 @@ class FinalProductionRefinementsTest extends TestCase
         $consumption = $this->consumptionService->recordConsumption(
             date: '2026-11-13',
             items: [
-                ['product_id' => $product->id, 'quantity_used' => 15.0]
+                ['product_id' => $product->id, 'quantity_used' => 15.0],
             ],
             userId: $this->admin->id,
             notes: 'Bread baking'
@@ -641,7 +644,7 @@ class FinalProductionRefinementsTest extends TestCase
         try {
             $this->reversalService->voidPurchase($purchase, 'Cancel invoice', false);
             $this->fail('Should have thrown ValidationException');
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             $this->assertStringContainsString('consumed', $e->getMessage());
         }
 

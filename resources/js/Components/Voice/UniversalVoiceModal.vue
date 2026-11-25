@@ -13,7 +13,6 @@ import {
     ArrowRight
 } from 'lucide-vue-next';
 import { useVoiceCostParser } from '../../Composables/useVoiceCostParser';
-import axios from 'axios';
 
 const props = defineProps({
     modelValue: Boolean,
@@ -123,16 +122,16 @@ const processSpokenText = async (rawText) => {
     if (term.length >= 2) {
         isSearchingDb.value = true;
         try {
-            const resp = await axios.get('/api/voice/lookup', {
-                params: {
-                    type: props.contextType === 'purchases' ? 'purchase_entities' : 
-                          props.contextType === 'attendance' ? 'employees' : 'cost_entities',
-                    q: term,
-                }
+            const lookupType = props.contextType === 'purchases' ? 'purchase_entities' : 
+                               props.contextType === 'attendance' ? 'employees' : 'cost_entities';
+            const params = new URLSearchParams({ type: lookupType, q: term });
+            const res = await fetch(`/api/voice/lookup?${params.toString()}`, {
+                headers: { 'Accept': 'application/json' }
             });
+            const respData = await res.json();
 
-            if (resp.data?.data) {
-                const data = resp.data.data;
+            if (respData?.data) {
+                const data = respData.data;
                 dbSearchResults.value = data;
 
                 // Auto-match first plausible product

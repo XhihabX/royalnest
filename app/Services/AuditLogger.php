@@ -45,7 +45,7 @@ class AuditLogger
         $cleanAfter = self::sanitizePayload($afterPayload);
 
         // Idempotency deduplication key
-        $eventHash = md5($action . $module . $entityType . $entityId . $status . ($transactionReference ?? ''));
+        $eventHash = md5($action.$module.$entityType.$entityId.$status.($transactionReference ?? ''));
         if (isset(self::$loggedHashes[$eventHash])) {
             return null; // Suppress duplicate event in same request cycle
         }
@@ -122,7 +122,7 @@ class AuditLogger
      */
     protected static function sanitizePayload(?array $payload): ?array
     {
-        if (!$payload) {
+        if (! $payload) {
             return null;
         }
 

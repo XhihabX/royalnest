@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AccountTransaction;
 use App\Models\DailySale;
 use App\Models\FinancialAccount;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -29,7 +30,6 @@ class DailySalesService
      *     source?: string|null,
      *     allow_mfs_cash_fallback?: bool|null
      * } $data
-     * @param int $userId
      * @return array{sale: DailySale, discrepancy: float, message: string}
      */
     public function recordDailySale(array $data, int $userId): array
@@ -67,11 +67,11 @@ class DailySalesService
         foreach ($channelAccountMap as $key => $info) {
             if ($info['amount'] > 0) {
                 $acc = FinancialAccount::where('type', $info['type'])->where('is_active', true)->first();
-                if (!$acc && $info['type'] === 'other') {
+                if (! $acc && $info['type'] === 'other') {
                     $acc = FinancialAccount::where('type', 'cash')->where('is_active', true)->first();
                 }
 
-                if (!$acc) {
+                if (! $acc) {
                     throw ValidationException::withMessages([
                         "{$key}_sales" => "Cannot record {$info['label']} sales of ৳{$info['amount']}: No active financial account of type '{$info['type']}' exists.",
                     ]);
@@ -98,7 +98,7 @@ class DailySalesService
                         'notes' => $data['notes'] ?? null,
                         'created_by' => $userId,
                     ]);
-                } catch (\Illuminate\Database\QueryException $e) {
+                } catch (QueryException $e) {
                     // If another concurrent request just created the row, re-fetch with lock
                     if ($e->getCode() == 23000 || str_contains($e->getMessage(), 'unique') || str_contains($e->getMessage(), 'Duplicate')) {
                         $dailySale = DailySale::where('sales_date', $date)->lockForUpdate()->firstOrFail();
@@ -123,7 +123,7 @@ class DailySalesService
                 $dailySale->card_bank_sales = $card;
                 $dailySale->other_sales = $other;
                 $dailySale->discrepancy_amount = $discrepancy;
-                if (!empty($data['notes'])) {
+                if (! empty($data['notes'])) {
                     $dailySale->notes = $data['notes'];
                 }
                 $dailySale->save();
@@ -172,7 +172,7 @@ class DailySalesService
                     'reversal_status' => 'reversed',
                     'reversed_at' => now(),
                     'reversed_by' => $userId,
-                    'reversal_reason' => "DailySale corrected on " . now()->toDateTimeString(),
+                    'reversal_reason' => 'DailySale corrected on '.now()->toDateTimeString(),
                     'compensating_transaction_id' => $compensating->id,
                 ]);
             }
@@ -270,7 +270,7 @@ class DailySalesService
                 $other = (float) $existing->other_sales;
                 $newTotal = round($estCash + $bkash + $nagad + $card + $other, 2);
 
-                $notes = ($existing->notes ? $existing->notes . ' | ' : '') . 'Cash sales synchronized from Cash Reconciliation.';
+                $notes = ($existing->notes ? $existing->notes.' | ' : '').'Cash sales synchronized from Cash Reconciliation.';
             } else {
                 $bkash = 0.00;
                 $nagad = 0.00;
@@ -294,4 +294,3 @@ class DailySalesService
         });
     }
 }
-

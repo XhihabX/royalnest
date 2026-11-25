@@ -6,6 +6,7 @@ use App\Models\FinancialAccount;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\SupplierProduct;
+use App\Services\AuditLogger;
 use App\Services\SupplierService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -256,7 +257,7 @@ class SupplierController extends Controller
         $name = $supplier->company_name;
         $supplier->delete();
 
-        \App\Services\AuditLogger::log(
+        AuditLogger::log(
             action: 'deleted',
             description: "Soft deleted supplier '{$name}' to Recycle Bin",
             entity: $supplier,

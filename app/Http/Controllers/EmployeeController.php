@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\FinancialAccount;
+use App\Services\AuditLogger;
 use App\Services\EmployeeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -303,7 +304,7 @@ class EmployeeController extends Controller
         $name = $employee->name;
         $employee->delete();
 
-        \App\Services\AuditLogger::log(
+        AuditLogger::log(
             action: 'deleted',
             description: "Soft deleted staff member '{$name}' to Recycle Bin",
             entity: $employee,

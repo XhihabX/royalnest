@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DailyCashReconciliation;
 use App\Models\DailySale;
 use App\Services\CashReconciliationService;
 use App\Services\DailySalesService;
 use App\Services\FinancialAccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -64,9 +66,9 @@ class CashReconciliationController extends Controller
         $estCash = round((float) $validated['estimated_cash_sales'], 2);
 
         // Security / Accounting guard: Check reconciliation status
-        $recon = \App\Models\DailyCashReconciliation::whereDate('reconciliation_date', $date)->first();
+        $recon = DailyCashReconciliation::whereDate('reconciliation_date', $date)->first();
         if ($recon && $recon->status === 'confirmed' && ! auth()->user()?->hasRole(['manager', 'owner', 'admin'])) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'date' => "Daily cash reconciliation for {$date} is locked and confirmed. Only a manager or owner can synchronize sales from a confirmed reconciliation.",
             ]);
         }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class AuditLog extends Model
 {
@@ -39,13 +40,13 @@ class AuditLog extends Model
     protected static function booted(): void
     {
         static::updating(function () {
-            throw new \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException(
+            throw new AccessDeniedHttpException(
                 'Audit logs are immutable and cannot be modified.'
             );
         });
 
         static::deleting(function () {
-            throw new \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException(
+            throw new AccessDeniedHttpException(
                 'Audit logs are immutable and cannot be deleted.'
             );
         });

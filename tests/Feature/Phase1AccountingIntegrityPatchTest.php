@@ -19,8 +19,11 @@ class Phase1AccountingIntegrityPatchTest extends TestCase
     use RefreshDatabase;
 
     protected User $manager;
+
     protected User $cashier;
+
     protected FinancialAccount $cashAccount;
+
     protected FinancialAccount $bkashAccount;
 
     protected function setUp(): void
@@ -261,4 +264,3 @@ class Phase1AccountingIntegrityPatchTest extends TestCase
         $response->assertSessionHasErrors(['date']);
     }
 }
-

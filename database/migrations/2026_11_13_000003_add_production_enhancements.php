@@ -69,7 +69,7 @@ return new class extends Migration
 
         // 5. RBAC: Ensure visitor role and seed granular permissions
         $visitorRole = DB::table('roles')->where('name', 'visitor')->first();
-        if (!$visitorRole) {
+        if (! $visitorRole) {
             $visitorRoleId = DB::table('roles')->insertGetId([
                 'name' => 'visitor',
                 'display_name' => 'Visitor (Read-Only)',
@@ -90,7 +90,7 @@ return new class extends Migration
 
         foreach ($newPermissions as $perm) {
             $exists = DB::table('permissions')->where('name', $perm['name'])->first();
-            if (!$exists) {
+            if (! $exists) {
                 $permId = DB::table('permissions')->insertGetId(array_merge($perm, [
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -155,4 +155,3 @@ return new class extends Migration
         });
     }
 };
-

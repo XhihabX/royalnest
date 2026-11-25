@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\EmployeeService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -28,7 +29,7 @@ class HandleInertiaRequests extends Middleware
                     'is_visitor' => $request->user()->primary_role === 'visitor' || $request->user()->hasRole('visitor'),
                 ] : null,
             ],
-            'unmarked_staff_count' => $request->user() ? count(app(\App\Services\EmployeeService::class)->getMissingAttendanceAlerts(now()->toDateString())) : 0,
+            'unmarked_staff_count' => $request->user() ? count(app(EmployeeService::class)->getMissingAttendanceAlerts(now()->toDateString())) : 0,
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

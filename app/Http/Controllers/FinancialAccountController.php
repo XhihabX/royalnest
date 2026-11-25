@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AccountTransaction;
 use App\Models\FinancialAccount;
+use App\Services\AuditLogger;
 use App\Services\FinancialAccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -106,7 +107,7 @@ class FinancialAccountController extends Controller
             currency: 'BDT'
         );
 
-        \App\Services\AuditLogger::log(
+        AuditLogger::log(
             action: 'created',
             description: "Created financial account '{$account->name}' ({$account->type}) with opening balance ৳{$account->opening_balance}",
             entity: $account,
@@ -119,14 +120,14 @@ class FinancialAccountController extends Controller
     public function update(Request $request, FinancialAccount $account): RedirectResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:100|unique:financial_accounts,name,' . $account->id,
+            'name' => 'required|string|max:100|unique:financial_accounts,name,'.$account->id,
             'type' => 'required|in:cash,bank,bkash,nagad,other',
         ]);
 
         $before = $account->only(['name', 'type']);
         $account->update($validated);
 
-        \App\Services\AuditLogger::log(
+        AuditLogger::log(
             action: 'updated',
             description: "Updated financial account '{$account->name}'",
             entity: $account,

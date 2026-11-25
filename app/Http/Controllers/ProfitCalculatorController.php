@@ -150,8 +150,8 @@ class ProfitCalculatorController extends Controller
 
                 $itemsHash = md5(json_encode($normalizedItems));
                 $expectedNoteTag = "[Payload:{$itemsHash}]";
-                $notePrefix = !empty($validated['notes']) ? $validated['notes'] . ' ' : 'Daily P&L Calculator Usage ';
-                $finalNote = $notePrefix . $expectedNoteTag;
+                $notePrefix = ! empty($validated['notes']) ? $validated['notes'].' ' : 'Daily P&L Calculator Usage ';
+                $finalNote = $notePrefix.$expectedNoteTag;
 
                 if (! empty($validated['consumption_id'])) {
                     // Corrective revision: restore old batches and re-consume with new quantities
@@ -209,4 +209,3 @@ class ProfitCalculatorController extends Controller
         return redirect()->back()->with('success', "Daily raw material usage & sales for {$date} saved and synchronized successfully.");
     }
 }
-

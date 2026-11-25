@@ -22,11 +22,7 @@ class ConsumptionRevisionService
      * 3. Re-applies FIFO batch consumption with the new requested quantities.
      * 4. Updates consumption header with new cost, timestamp, and audit trail.
      *
-     * @param Consumption $existing
-     * @param array<int, array{product_id: int, quantity_used: float|int, notes?: string|null}> $newItems
-     * @param int $userId
-     * @param string|null $notes
-     * @return Consumption
+     * @param  array<int, array{product_id: int, quantity_used: float|int, notes?: string|null}>  $newItems
      */
     public function reviseConsumption(Consumption $existing, array $newItems, int $userId, ?string $notes = null): Consumption
     {
@@ -115,7 +111,7 @@ class ConsumptionRevisionService
                         quantity: (float) $product->current_stock,
                         unitCost: (float) $product->cost_price,
                         receivedDate: $date,
-                        batchNo: 'OPENING-AUTO-' . $product->id
+                        batchNo: 'OPENING-AUTO-'.$product->id
                     );
                     $batches = collect([$fallbackBatch]);
                 }
@@ -222,4 +218,3 @@ class ConsumptionRevisionService
         });
     }
 }
-

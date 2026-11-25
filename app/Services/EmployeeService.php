@@ -440,8 +440,8 @@ class EmployeeService
         if ((float) $employee->held_salary_amount > 0) {
             $heldDeposit = (float) $employee->held_salary_amount;
         } elseif ((int) $employee->held_salary_days > 0) {
-            $dailyRate = $employee->salary_type === 'daily' 
-                ? (float) $employee->agreed_salary 
+            $dailyRate = $employee->salary_type === 'daily'
+                ? (float) $employee->agreed_salary
                 : round((float) $employee->agreed_salary / 30, 2);
             $heldDeposit = round($dailyRate * (int) $employee->held_salary_days, 2);
         }

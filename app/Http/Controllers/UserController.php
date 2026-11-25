@@ -111,7 +111,7 @@ class UserController extends Controller
         $user->email = $validated['email'];
         $user->phone = $validated['phone'];
 
-        if (!$user->isSuperAdmin()) {
+        if (! $user->isSuperAdmin()) {
             $user->primary_role = $validated['primary_role'];
             $role = Role::where('name', $validated['primary_role'])->first();
             if ($role) {
@@ -119,7 +119,7 @@ class UserController extends Controller
             }
         }
 
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $user->password = Hash::make($validated['password']);
         }
 
@@ -154,12 +154,12 @@ class UserController extends Controller
             ]);
         }
 
-        $user->is_active = !$user->is_active;
+        $user->is_active = ! $user->is_active;
         $user->save();
 
         AuditLogger::log(
             action: 'status_toggled',
-            description: ($user->is_active ? 'Activated' : 'Deactivated') . " user '{$user->name}'",
+            description: ($user->is_active ? 'Activated' : 'Deactivated')." user '{$user->name}'",
             entity: $user,
             module: 'rbac'
         );
@@ -197,4 +197,3 @@ class UserController extends Controller
         return back()->with('success', "User '{$userName}' deleted.");
     }
 }
-

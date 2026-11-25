@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AccountTransaction;
 use App\Models\DailySale;
 use App\Models\Employee;
 use App\Models\EmployeeAdvance;
@@ -72,7 +73,7 @@ class ReversalService
             }
 
             // 2. Decision Logic
-            if ($hasConsumedItems && !$allowPartialReturn) {
+            if ($hasConsumedItems && ! $allowPartialReturn) {
                 AuditLogger::logFailure(
                     'void_blocked',
                     "Purchase #{$purchase->invoice_no} void blocked: stock partially or fully consumed",
@@ -261,7 +262,7 @@ class ReversalService
             $lockedSupplier = Supplier::lockForUpdate()->findOrFail($supplier->id);
             $account = FinancialAccount::lockForUpdate()->findOrFail($receivingAccountId);
 
-            if (!$account->is_active) {
+            if (! $account->is_active) {
                 throw ValidationException::withMessages([
                     'receiving_account_id' => 'The selected receiving account is inactive.',
                 ]);
@@ -282,7 +283,7 @@ class ReversalService
             }
 
             // Prevent duplicate refund with the exact same reference
-            $duplicate = \App\Models\AccountTransaction::where('reference_type', 'SupplierRefund')
+            $duplicate = AccountTransaction::where('reference_type', 'SupplierRefund')
                 ->where('reference_id', $lockedSupplier->id)
                 ->where('notes', 'like', "%(Ref: {$reference})%")
                 ->exists();
@@ -379,7 +380,7 @@ class ReversalService
         $remaining = (float) $advance->remaining_balance;
         if ($remaining < $initialAmount) {
             throw ValidationException::withMessages([
-                'advance' => "Cannot void Advance #{$advance->voucher_no} because ৳" . ($initialAmount - $remaining) . " has already been recovered in finalized salary deductions.",
+                'advance' => "Cannot void Advance #{$advance->voucher_no} because ৳".($initialAmount - $remaining).' has already been recovered in finalized salary deductions.',
             ]);
         }
 
@@ -432,7 +433,7 @@ class ReversalService
         DB::transaction(function () use ($advance, $amount, $receivingAccountId, $notes) {
             $account = FinancialAccount::lockForUpdate()->findOrFail($receivingAccountId);
 
-            if (!$account->is_active) {
+            if (! $account->is_active) {
                 throw ValidationException::withMessages([
                     'receiving_account_id' => 'The selected receiving account is inactive.',
                 ]);
@@ -440,7 +441,7 @@ class ReversalService
 
             if ($amount > (float) $advance->remaining_balance) {
                 throw ValidationException::withMessages([
-                    'amount' => 'Repayment amount exceeds remaining advance balance of ৳' . $advance->remaining_balance,
+                    'amount' => 'Repayment amount exceeds remaining advance balance of ৳'.$advance->remaining_balance,
                 ]);
             }
 

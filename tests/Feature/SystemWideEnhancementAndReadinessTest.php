@@ -2,13 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Category;
-use App\Models\Consumption;
 use App\Models\DailySale;
 use App\Models\Employee;
-use App\Models\EmployeeAdvance;
 use App\Models\FinancialAccount;
 use App\Models\OperatingExpense;
 use App\Models\Product;
@@ -21,11 +18,7 @@ use App\Models\Supplier;
 use App\Models\SupplierPayment;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Services\FinancialAccountService;
-use App\Services\PurchaseService;
 use App\Services\ReversalService;
-use App\Services\StockLedgerService;
-use App\Services\SupplierService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -36,10 +29,15 @@ class SystemWideEnhancementAndReadinessTest extends TestCase
     use RefreshDatabase;
 
     protected User $superAdmin;
+
     protected User $manager;
+
     protected User $visitor;
+
     protected Branch $branch;
+
     protected FinancialAccount $cashAccount;
+
     protected ReversalService $reversalService;
 
     protected function setUp(): void

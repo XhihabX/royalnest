@@ -179,7 +179,7 @@ class SupplierService
 
                     if ($allocAmount > $remainingOnBill) {
                         throw ValidationException::withMessages([
-                            'allocations' => "Allocated amount (৳{$allocAmount}) cannot exceed remaining unpaid bill amount (৳{$remainingOnBill}) for invoice #{$purchase->invoice_no}."
+                            'allocations' => "Allocated amount (৳{$allocAmount}) cannot exceed remaining unpaid bill amount (৳{$remainingOnBill}) for invoice #{$purchase->invoice_no}.",
                         ]);
                     }
 
@@ -194,7 +194,7 @@ class SupplierService
 
             if ($totalAllocated > $amount) {
                 throw ValidationException::withMessages([
-                    'allocations' => "Total bill allocations (৳{$totalAllocated}) cannot exceed payment amount (৳{$amount})."
+                    'allocations' => "Total bill allocations (৳{$totalAllocated}) cannot exceed payment amount (৳{$amount}).",
                 ]);
             }
 
@@ -433,6 +433,7 @@ class SupplierService
                     ->where('reference_id', $vp->id)
                     ->selectRaw('SUM(quantity_out * unit_cost) as val')
                     ->value('val') ?? $vp->total_amount);
+
                 return min((float) $vp->paid_amount, $returnVal);
             });
 

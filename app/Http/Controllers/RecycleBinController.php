@@ -110,7 +110,7 @@ class RecycleBinController extends Controller
             module: 'recycle_bin'
         );
 
-        return back()->with('success', ucfirst($type) . ' successfully restored.');
+        return back()->with('success', ucfirst($type).' successfully restored.');
     }
 
     /**
@@ -119,7 +119,7 @@ class RecycleBinController extends Controller
     public function purge(Request $request): RedirectResponse
     {
         $user = $request->user();
-        if (!$user || !$user->isSuperAdmin()) {
+        if (! $user || ! $user->isSuperAdmin()) {
             abort(403, 'Only the Super Admin can permanently purge records from the Recycle Bin.');
         }
 
@@ -199,7 +199,6 @@ class RecycleBinController extends Controller
             module: 'recycle_bin'
         );
 
-        return back()->with('success', ucfirst($type) . ' permanently deleted.');
+        return back()->with('success', ucfirst($type).' permanently deleted.');
     }
 }
-
