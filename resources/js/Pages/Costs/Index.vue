@@ -31,21 +31,52 @@ import {
     Ban
 } from 'lucide-vue-next';
 import { useI18n } from '@/Composables/useI18n';
+import { useVoiceCostParser } from '@/Composables/useVoiceCostParser';
 import UniversalVoiceModal from '@/Components/Voice/UniversalVoiceModal.vue';
 import VoiceInputButton from '@/Components/Voice/VoiceInputButton.vue';
 
 const props = defineProps({
-    templates: Object,
-    products: Array,
-    categories: Array,
-    suppliers: Array,
-    employees: Array,
-    accounts: Array,
-    recentPurchases: Array,
-    recentExpenses: Array,
-    dailySummary: Object,
+    templates: {
+        type: Object,
+        default: () => ({ favorites: [], frequently_used: [], recently_used: [], all: [] }),
+    },
+    products: {
+        type: Array,
+        default: () => [],
+    },
+    categories: {
+        type: Array,
+        default: () => [],
+    },
+    suppliers: {
+        type: Array,
+        default: () => [],
+    },
+    employees: {
+        type: Array,
+        default: () => [],
+    },
+    accounts: {
+        type: Array,
+        default: () => [],
+    },
+    recentPurchases: {
+        type: Array,
+        default: () => [],
+    },
+    recentExpenses: {
+        type: Array,
+        default: () => [],
+    },
+    dailySummary: {
+        type: Object,
+        default: () => ({}),
+    },
     selectedDate: String,
-    filters: Object,
+    filters: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
 const { t } = useI18n();
@@ -62,7 +93,7 @@ const {
     parseCostSpeech 
 } = useVoiceCostParser();
 
-const searchShortcut = ref(props.filters.search || '');
+const searchShortcut = ref(props.filters?.search || '');
 const activeTab = ref('purchase'); // purchase, consumption, expense, salary_payment, salary_advance, supplier_payment, other
 const voicePreview = ref(null);
 const showVoiceBox = ref(false);
@@ -81,7 +112,7 @@ const form = useForm({
     unit_price: 0,
     amount: 0,
     paid_amount: 0,
-    payment_account_id: props.accounts[0]?.id || '',
+    payment_account_id: props.accounts?.[0]?.id || '',
     is_purchase_and_consume: false,
     recover_advances: true,
     salary_month: new Date().toISOString().slice(0, 7),
@@ -200,7 +231,7 @@ const selectShortcut = (tpl) => {
 };
 
 const onProductSelect = () => {
-    const prod = props.products.find(p => p.id === form.product_id);
+    const prod = props.products?.find(p => p.id === form.product_id);
     if (prod) {
         form.name = prod.name;
         form.unit = prod.purchase_unit || prod.base_unit;
@@ -213,12 +244,12 @@ const onProductSelect = () => {
 
 const selectedEmployeeInfo = computed(() => {
     if (!form.employee_id) return null;
-    return props.employees.find(e => e.id === form.employee_id) || null;
+    return props.employees?.find(e => e.id === form.employee_id) || null;
 });
 
 const selectedSupplierInfo = computed(() => {
     if (!form.supplier_id) return null;
-    return props.suppliers.find(s => s.id === form.supplier_id) || null;
+    return props.suppliers?.find(s => s.id === form.supplier_id) || null;
 });
 
 const onEmployeeSelect = () => {
@@ -239,7 +270,7 @@ const onEmployeeSelect = () => {
             }
         }
         // Default to cash drawer account
-        const cashAcc = props.accounts.find(a => a.type === 'cash') || props.accounts[0];
+        const cashAcc = props.accounts?.find(a => a.type === 'cash') || props.accounts?.[0];
         if (cashAcc) form.payment_account_id = cashAcc.id;
     }
 };
@@ -277,7 +308,7 @@ const setBillAllocation = (purchaseId, maxDue, amount) => {
 const quickWorkerPayout = (type) => {
     activeTab.value = type;
     form.transaction_type = type;
-    const cashAcc = props.accounts.find(a => a.type === 'cash') || props.accounts[0];
+    const cashAcc = props.accounts?.find(a => a.type === 'cash') || props.accounts?.[0];
     if (cashAcc) form.payment_account_id = cashAcc.id;
 };
 
@@ -362,7 +393,7 @@ const toggleFav = (tplId) => {
                         কাঁচামাল ক্রয় (Asset)
                     </span>
                     <span class="text-sm font-extrabold text-amber-400 font-mono block">
-                        ৳{{ Number(dailySummary.raw_material_purchases).toLocaleString() }}
+                        ৳{{ Number(dailySummary?.raw_material_purchases || 0).toLocaleString() }}
                     </span>
                     <span class="text-[9px] text-slate-500">ইনভেন্টরি অ্যাসেট বৃদ্ধি</span>
                 </div>
@@ -373,7 +404,7 @@ const toggleFav = (tplId) => {
                         প্যাকেজিং ক্রয় (Asset)
                     </span>
                     <span class="text-sm font-extrabold text-amber-300 font-mono block">
-                        ৳{{ Number(dailySummary.packaging_purchases).toLocaleString() }}
+                        ৳{{ Number(dailySummary?.packaging_purchases || 0).toLocaleString() }}
                     </span>
                     <span class="text-[9px] text-slate-500">বক্স, ফয়েল, ক্যারিব্যাগ</span>
                 </div>
@@ -384,7 +415,7 @@ const toggleFav = (tplId) => {
                         পরিচালন খরচ (P&L)
                     </span>
                     <span class="text-sm font-extrabold text-rose-400 font-mono block">
-                        ৳{{ Number(dailySummary.operating_expenses).toLocaleString() }}
+                        ৳{{ Number(dailySummary?.operating_expenses || 0).toLocaleString() }}
                     </span>
                     <span class="text-[9px] text-slate-500">গ্যাস, বিদ্যুৎ, ভাড়া ইত্যাদি</span>
                 </div>
@@ -395,7 +426,7 @@ const toggleFav = (tplId) => {
                         দেনা পরিশোধ ও অগ্রিম
                     </span>
                     <span class="text-sm font-extrabold text-indigo-300 font-mono block">
-                        ৳{{ Number(dailySummary.total_liability_outflows).toLocaleString() }}
+                        ৳{{ Number(dailySummary?.total_liability_outflows || 0).toLocaleString() }}
                     </span>
                     <span class="text-[9px] text-slate-500">বাকি শোধ / বেতন / অগ্রিম</span>
                 </div>
@@ -406,7 +437,7 @@ const toggleFav = (tplId) => {
                         মোট বিক্রয় (Sales)
                     </span>
                     <span class="text-sm font-extrabold text-emerald-400 font-mono block">
-                        ৳{{ Number(dailySummary.gross_sales).toLocaleString() }}
+                        ৳{{ Number(dailySummary?.gross_sales || 0).toLocaleString() }}
                     </span>
                     <span class="text-[9px] text-slate-500">ক্যাশ ও ডিজিটাল বিক্রয়</span>
                 </div>
@@ -417,7 +448,7 @@ const toggleFav = (tplId) => {
                         খাবার খরচ (COGS)
                     </span>
                     <span class="text-sm font-extrabold text-cyan-400 font-mono block">
-                        ৳{{ Number(dailySummary.cogs).toLocaleString() }}
+                        ৳{{ Number(dailySummary?.cogs || 0).toLocaleString() }}
                     </span>
                     <span class="text-[9px] text-slate-500">রান্নাঘরে ব্যবহৃত কাঁচামাল</span>
                 </div>
@@ -448,7 +479,7 @@ const toggleFav = (tplId) => {
             <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
                 <!-- Favorite Shortcuts -->
                 <button
-                    v-for="tpl in templates.favorites"
+                    v-for="tpl in (templates?.favorites || [])"
                     :key="'fav-' + tpl.id"
                     type="button"
                     @click="selectShortcut(tpl)"
@@ -461,7 +492,7 @@ const toggleFav = (tplId) => {
 
                 <!-- Frequently & Recently Used -->
                 <button
-                    v-for="tpl in templates.frequently_used"
+                    v-for="tpl in (templates?.frequently_used || [])"
                     :key="'freq-' + tpl.id"
                     type="button"
                     @click="selectShortcut(tpl)"
@@ -472,7 +503,7 @@ const toggleFav = (tplId) => {
                     <span v-if="tpl.last_unit_price > 0" class="text-[11px] text-slate-400 font-mono">৳{{ Number(tpl.last_unit_price).toFixed(0) }}</span>
                 </button>
 
-                <div v-if="templates.favorites.length === 0 && templates.frequently_used.length === 0" class="text-xs text-slate-500 italic py-1">
+                <div v-if="!templates?.favorites?.length && !templates?.frequently_used?.length" class="text-xs text-slate-500 italic py-1">
                     No shortcuts yet. Check "Save as Quick Template" below to pin your everyday purchases.
                 </div>
             </div>
@@ -905,7 +936,7 @@ const toggleFav = (tplId) => {
                         </div>
                     </div>
 
-                    <div v-if="recentPurchases.length === 0 && recentExpenses.length === 0" class="text-center py-8 text-xs text-slate-500 italic">
+                    <div v-if="!recentPurchases?.length && !recentExpenses?.length" class="text-center py-8 text-xs text-slate-500 italic">
                         No transactions recorded for this date yet.
                     </div>
                 </div>
