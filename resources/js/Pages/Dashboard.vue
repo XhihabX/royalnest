@@ -99,11 +99,11 @@ const onDateChange = () => {
                     </div>
                 </div>
                 <div class="text-2xl font-black text-white font-mono">
-                    ৳ {{ Number(summary.sales.total_sales).toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+                    ৳ {{ Number(summary?.sales?.total_sales || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
                 </div>
                 <div class="mt-3 text-xs text-slate-400 flex items-center justify-between pt-2 border-t border-slate-800/60">
-                    <span>Cash: ৳{{ summary.sales.cash_sales }}</span>
-                    <span>MFS: ৳{{ Number(summary.sales.bkash_sales + summary.sales.nagad_sales).toFixed(2) }}</span>
+                    <span>Cash: ৳{{ summary?.sales?.cash_sales || '0.00' }}</span>
+                    <span>MFS: ৳{{ Number((summary?.sales?.bkash_sales || 0) + (summary?.sales?.nagad_sales || 0)).toFixed(2) }}</span>
                 </div>
             </div>
 
@@ -116,11 +116,11 @@ const onDateChange = () => {
                     </div>
                 </div>
                 <div class="text-2xl font-black text-amber-300 font-mono">
-                    ৳ {{ Number(summary.cost_of_materials.total).toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+                    ৳ {{ Number(summary?.cost_of_materials?.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
                 </div>
                 <div class="mt-3 text-xs text-slate-400 flex items-center justify-between pt-2 border-t border-slate-800/60">
-                    <span>Usage: ৳{{ summary.cost_of_materials.ingredient_consumption }}</span>
-                    <span>Consumables: ৳{{ summary.cost_of_materials.consumables_allocated }}</span>
+                    <span>Usage: ৳{{ summary?.cost_of_materials?.ingredient_consumption || '0.00' }}</span>
+                    <span>Consumables: ৳{{ summary?.cost_of_materials?.consumables_allocated || '0.00' }}</span>
                 </div>
             </div>
 
@@ -133,11 +133,11 @@ const onDateChange = () => {
                     </div>
                 </div>
                 <div class="text-2xl font-black text-slate-200 font-mono">
-                    ৳ {{ Number(summary.operating_costs.total).toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+                    ৳ {{ Number(summary?.operating_costs?.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
                 </div>
                 <div class="mt-3 text-xs text-slate-400 flex items-center justify-between pt-2 border-t border-slate-800/60">
-                    <span>Expenses: ৳{{ summary.operating_costs.operating_expenses }}</span>
-                    <span>Salary: ৳{{ summary.operating_costs.salary_cost }}</span>
+                    <span>Expenses: ৳{{ summary?.operating_costs?.operating_expenses || '0.00' }}</span>
+                    <span>Salary: ৳{{ summary?.operating_costs?.salary_cost || '0.00' }}</span>
                 </div>
             </div>
 
@@ -145,31 +145,31 @@ const onDateChange = () => {
             <div 
                 :class="[
                     'border rounded-2xl p-5 relative overflow-hidden',
-                    summary.net_profit >= 0 
+                    (summary?.net_profit ?? 0) >= 0 
                         ? 'bg-emerald-950/20 border-emerald-500/30' 
                         : 'bg-rose-950/20 border-rose-500/30'
                 ]"
             >
                 <div class="flex items-center justify-between mb-3">
-                    <span class="text-xs font-semibold uppercase tracking-wider" :class="summary.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                    <span class="text-xs font-semibold uppercase tracking-wider" :class="(summary?.net_profit ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'">
                         {{ t('today_net_profit', 'True Net Profit') }}
                     </span>
                     <div 
                         class="w-8 h-8 rounded-lg flex items-center justify-center"
-                        :class="summary.net_profit >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'"
+                        :class="(summary?.net_profit ?? 0) >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'"
                     >
-                        <component :is="summary.net_profit >= 0 ? TrendingUp : TrendingDown" class="w-4 h-4" />
+                        <component :is="(summary?.net_profit ?? 0) >= 0 ? TrendingUp : TrendingDown" class="w-4 h-4" />
                     </div>
                 </div>
                 <div 
                     class="text-2xl font-black font-mono"
-                    :class="summary.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'"
+                    :class="(summary?.net_profit ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'"
                 >
-                    ৳ {{ Number(summary.net_profit).toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+                    ৳ {{ Number(summary?.net_profit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
                 </div>
                 <div class="mt-3 text-xs text-slate-400 flex items-center justify-between pt-2 border-t border-slate-800/60">
-                    <span>{{ t('net_margin', 'Margin') }}: {{ summary.profit_margin }}%</span>
-                    <span>Gross: ৳{{ summary.gross_profit }}</span>
+                    <span>{{ t('net_margin', 'Margin') }}: {{ summary?.profit_margin || 0 }}%</span>
+                    <span>Gross: ৳{{ summary?.gross_profit || '0.00' }}</span>
                 </div>
             </div>
         </div>

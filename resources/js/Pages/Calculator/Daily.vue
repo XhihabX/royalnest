@@ -49,12 +49,12 @@ const usageItems = ref([
 
 // Sales form
 const sales = ref({
-    cash_sales: props.salesData.cash_sales || 0,
-    bkash_sales: props.salesData.bkash_sales || 0,
-    nagad_sales: props.salesData.nagad_sales || 0,
-    card_bank_sales: props.salesData.card_bank_sales || 0,
-    other_sales: props.salesData.other_sales || 0,
-    total_sales: props.salesData.total_sales || 0,
+    cash_sales: props.salesData?.cash_sales || 0,
+    bkash_sales: props.salesData?.bkash_sales || 0,
+    nagad_sales: props.salesData?.nagad_sales || 0,
+    card_bank_sales: props.salesData?.card_bank_sales || 0,
+    other_sales: props.salesData?.other_sales || 0,
+    total_sales: props.salesData?.total_sales || 0,
 });
 
 const notes = ref('');
@@ -66,6 +66,7 @@ const changeDate = () => {
 
 // Filtered products for dropdown
 const filteredProducts = computed(() => {
+    if (!props.products) return [];
     if (!productSearch.value) return props.products;
     const q = productSearch.value.toLowerCase();
     return props.products.filter(p => 
@@ -78,7 +79,7 @@ const filteredProducts = computed(() => {
 // On product selection in row
 const onSelectProduct = (index) => {
     const item = usageItems.value[index];
-    const product = props.products.find(p => p.id === item.product_id);
+    const product = props.products?.find(p => p.id === item.product_id);
     if (product) {
         item.name = product.name;
         item.unit = product.base_unit;
@@ -127,7 +128,7 @@ const computedNewUsageCost = computed(() => {
 });
 
 const totalMaterialCostToday = computed(() => {
-    return Number((computedNewUsageCost.value + props.alreadyConsumedTotal + props.consumablesAllocated).toFixed(2));
+    return Number((computedNewUsageCost.value + (props.alreadyConsumedTotal || 0) + (props.consumablesAllocated || 0)).toFixed(2));
 });
 
 const grossProfit = computed(() => {
@@ -135,7 +136,7 @@ const grossProfit = computed(() => {
 });
 
 const totalOperatingExpenses = computed(() => {
-    return Number((props.operatingExpensesTotal + props.staffSalaryCost + props.wastageCost).toFixed(2));
+    return Number(((props.operatingExpensesTotal || 0) + (props.staffSalaryCost || 0) + (props.wastageCost || 0)).toFixed(2));
 });
 
 const netProfit = computed(() => {
