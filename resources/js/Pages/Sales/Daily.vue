@@ -24,10 +24,22 @@ const form = useForm({
 });
 
 const handleVoiceApply = (parsed) => {
-    if (parsed.amount) {
+    if (parsed.total_sales !== null && parsed.total_sales !== undefined) {
+        form.total_sales = parsed.total_sales;
+    } else if (parsed.amount) {
         form.total_sales = parsed.amount;
+    }
+
+    if (parsed.cash_sales !== null && parsed.cash_sales !== undefined) {
+        form.cash_sales = parsed.cash_sales;
+    } else if (parsed.amount && !parsed.bkash_sales && !parsed.nagad_sales && !parsed.card_sales) {
         form.cash_sales = parsed.amount;
     }
+
+    if (parsed.bkash_sales !== null && parsed.bkash_sales !== undefined) form.bkash_sales = parsed.bkash_sales;
+    if (parsed.nagad_sales !== null && parsed.nagad_sales !== undefined) form.nagad_sales = parsed.nagad_sales;
+    if (parsed.card_sales !== null && parsed.card_sales !== undefined) form.card_bank_sales = parsed.card_sales;
+    if (parsed.other_sales !== null && parsed.other_sales !== undefined) form.other_sales = parsed.other_sales;
     if (parsed.note) form.notes = parsed.note;
 };
 

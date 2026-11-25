@@ -4,6 +4,7 @@ import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Trash2, Plus, AlertCircle } from 'lucide-vue-next';
 import { useI18n } from '@/Composables/useI18n';
+import VoiceInputButton from '@/Components/Voice/VoiceInputButton.vue';
 
 const { t } = useI18n();
 
@@ -26,6 +27,24 @@ const selectedProduct = ref(null);
 
 const onProductSelect = () => {
     selectedProduct.value = props.products.find(p => p.id === form.product_id);
+};
+
+const handleVoiceApply = (parsed) => {
+    let pId = parsed.product_id;
+    if (!pId && (parsed.item_name || parsed.name) && props.products) {
+        const searchName = (parsed.item_name || parsed.name).toLowerCase();
+        const found = props.products.find(p => p.name.toLowerCase().includes(searchName))
+            || props.products.find(p => searchName.includes(p.name.toLowerCase()));
+        if (found) pId = found.id;
+    }
+    if (pId) {
+        form.product_id = pId;
+        onProductSelect();
+    }
+    if (parsed.quantity) form.quantity = parsed.quantity;
+    if (parsed.reason) form.reason = parsed.reason;
+    if (parsed.note) form.notes = parsed.note;
+    showModal.value = true;
 };
 
 const openModal = () => {
@@ -54,13 +73,22 @@ const submit = () => {
                 </p>
             </div>
 
-            <button 
-                @click="openModal"
-                class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer"
-            >
-                <Plus class="w-4 h-4" />
-                <span>{{ t('record_wastage', 'Record Wastage') }}</span>
-            </button>
+            <div class="flex items-center gap-2">
+                <VoiceInputButton
+                    context-type="wastage"
+                    title="অপচয় ভয়েস ইনপুট"
+                    hint='যেমন: "টমেটো ২ কেজি পচে নষ্ট হয়েছে"'
+                    @apply="handleVoiceApply"
+                />
+
+                <button 
+                    @click="openModal"
+                    class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer min-h-[40px]"
+                >
+                    <Plus class="w-4 h-4" />
+                    <span>{{ t('record_wastage', 'Record Wastage') }}</span>
+                </button>
+            </div>
         </div>
 
         <!-- Wastage Table -->

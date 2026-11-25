@@ -156,16 +156,20 @@ watch(transcript, (newText) => {
 });
 
 const onVoiceApply = (parsed) => {
+    if (parsed.transaction_type && ['purchase', 'consumption', 'expense', 'salary_payment', 'salary_advance', 'supplier_payment'].includes(parsed.transaction_type)) {
+        activeTab.value = parsed.transaction_type;
+    }
     if (parsed.item_name) form.name = parsed.item_name;
     if (parsed.product_id) {
         form.product_id = parsed.product_id;
-        activeTab.value = 'purchase';
+        if (!parsed.transaction_type) activeTab.value = 'purchase';
     }
     if (parsed.supplier_id) form.supplier_id = parsed.supplier_id;
     if (parsed.employee_id) {
         form.employee_id = parsed.employee_id;
-        activeTab.value = 'salary_payment';
+        if (!parsed.transaction_type) activeTab.value = 'salary_payment';
     }
+    if (parsed.category) form.expense_category = parsed.category;
     if (parsed.quantity) form.quantity = parsed.quantity;
     if (parsed.unit) form.unit = parsed.unit;
     if (parsed.amount) {

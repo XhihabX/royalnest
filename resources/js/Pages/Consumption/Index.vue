@@ -4,6 +4,7 @@ import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Flame, Plus, Trash2, AlertTriangle, CheckCircle2 } from 'lucide-vue-next';
 import { useI18n } from '@/Composables/useI18n';
+import VoiceInputButton from '@/Components/Voice/VoiceInputButton.vue';
 
 const { t } = useI18n();
 
@@ -54,6 +55,37 @@ const computedTotalCost = computed(() => {
     }, 0);
 });
 
+const handleVoiceApply = (parsed) => {
+    const detectedItems = (parsed.items && parsed.items.length > 0) ? parsed.items : [];
+    if (detectedItems.length === 0 && (parsed.item_name || parsed.name) && parsed.quantity) {
+        detectedItems.push({
+            item_name: parsed.item_name || parsed.name,
+            quantity: parsed.quantity,
+            unit: parsed.unit
+        });
+    }
+
+    if (detectedItems.length > 0 && props.products) {
+        form.items = [];
+        for (const it of detectedItems) {
+            const searchName = (it.item_name || '').toLowerCase();
+            const matchedProd = props.products.find(p => p.name.toLowerCase().includes(searchName)) 
+                || props.products.find(p => searchName.includes(p.name.toLowerCase()));
+
+            form.items.push({
+                product_id: matchedProd ? matchedProd.id : '',
+                quantity_used: it.quantity,
+                notes: it.notes || it.item_name
+            });
+        }
+    }
+    if (form.items.length === 0) {
+        form.items = [{ product_id: '', quantity_used: '', notes: '' }];
+    }
+    if (parsed.note) form.notes = parsed.note;
+    showModal.value = true;
+};
+
 const openModal = () => {
     form.reset();
     form.items = [{ product_id: '', quantity_used: '', notes: '' }];
@@ -84,13 +116,22 @@ const submit = () => {
                 </p>
             </div>
 
-            <button 
-                @click="openModal"
-                class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer"
-            >
-                <Plus class="w-4 h-4" />
-                <span>{{ t('record_consumption', 'Record Daily Consumption') }}</span>
-            </button>
+            <div class="flex items-center gap-2">
+                <VoiceInputButton
+                    context-type="consumption"
+                    title="উপাদান ব্যবহার ভয়েস ইনপুট"
+                    hint='যেমন: "আলু ১০ কেজি, মুরগি ২০ কেজি, তেল ৫ লিটার খরচ"'
+                    @apply="handleVoiceApply"
+                />
+
+                <button 
+                    @click="openModal"
+                    class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-amber-500/10 transition cursor-pointer min-h-[40px]"
+                >
+                    <Plus class="w-4 h-4" />
+                    <span>{{ t('record_consumption', 'Record Daily Consumption') }}</span>
+                </button>
+            </div>
         </div>
 
         <!-- History of Consumptions -->

@@ -22,6 +22,7 @@ import {
     Boxes
 } from 'lucide-vue-next';
 import { useI18n } from '@/Composables/useI18n';
+import VoiceInputButton from '@/Components/Voice/VoiceInputButton.vue';
 
 const props = defineProps({
     date: String,
@@ -151,6 +152,70 @@ const profitMargin = computed(() => {
 // Form submission
 const isSubmitting = ref(false);
 
+const handleVoiceApply = (parsed) => {
+    // 1. If sales data was spoken
+    if (parsed.total_sales !== null && parsed.total_sales !== undefined) {
+        sales.value.total_sales = parsed.total_sales;
+        if (!parsed.cash_sales && !parsed.bkash_sales) {
+            sales.value.cash_sales = parsed.total_sales;
+        }
+    } else if (parsed.amount && !parsed.items?.length) {
+        sales.value.total_sales = parsed.amount;
+        sales.value.cash_sales = parsed.amount;
+    }
+
+    if (parsed.cash_sales !== null && parsed.cash_sales !== undefined) sales.value.cash_sales = parsed.cash_sales;
+    if (parsed.bkash_sales !== null && parsed.bkash_sales !== undefined) sales.value.bkash_sales = parsed.bkash_sales;
+    if (parsed.nagad_sales !== null && parsed.nagad_sales !== undefined) sales.value.nagad_sales = parsed.nagad_sales;
+    if (parsed.card_sales !== null && parsed.card_sales !== undefined) sales.value.card_bank_sales = parsed.card_sales;
+
+    // 2. If ingredient usage items were detected
+    const detectedItems = (parsed.items && parsed.items.length > 0) ? parsed.items : [];
+    if (detectedItems.length === 0 && (parsed.item_name || parsed.name) && parsed.quantity) {
+        detectedItems.push({
+            item_name: parsed.item_name || parsed.name,
+            quantity: parsed.quantity,
+            unit: parsed.unit
+        });
+    }
+
+    if (detectedItems.length > 0 && props.products) {
+        // Clear empty initial row if unmodified
+        if (usageItems.value.length === 1 && !usageItems.value[0].product_id) {
+            usageItems.value = [];
+        }
+
+        for (const it of detectedItems) {
+            const searchName = (it.item_name || '').toLowerCase();
+            const matchedProd = props.products.find(p => p.name.toLowerCase().includes(searchName)) 
+                || props.products.find(p => searchName.includes(p.name.toLowerCase()));
+
+            if (matchedProd) {
+                usageItems.value.push({
+                    product_id: matchedProd.id,
+                    quantity_used: it.quantity,
+                    unit_cost: matchedProd.fifo_unit_cost || matchedProd.cost_price,
+                    unit: matchedProd.base_unit || it.unit || 'kg',
+                    name: matchedProd.name,
+                    available_stock: matchedProd.current_stock
+                });
+            } else {
+                usageItems.value.push({
+                    product_id: '',
+                    quantity_used: it.quantity,
+                    unit_cost: 0,
+                    unit: it.unit || 'kg',
+                    name: it.item_name,
+                    available_stock: 0
+                });
+            }
+        }
+        if (usageItems.value.length === 0) {
+            usageItems.value.push({ product_id: '', quantity_used: '', unit_cost: 0, unit: '', name: '', available_stock: 0 });
+        }
+    }
+};
+
 const submit = () => {
     isSubmitting.value = true;
     
@@ -207,15 +272,24 @@ const submit = () => {
                 </p>
             </div>
 
-            <!-- Date Selector Pill -->
-            <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 rounded-xl p-1.5 self-start sm:self-auto">
-                <Calendar class="w-4 h-4 text-amber-400 ml-1.5" />
-                <input
-                    type="date"
-                    v-model="selectedDate"
-                    @change="changeDate"
-                    class="bg-transparent border-none text-xs text-white font-mono focus:outline-none cursor-pointer"
+            <!-- Date Selector Pill & Voice Button -->
+            <div class="flex items-center gap-2 self-start sm:self-auto">
+                <VoiceInputButton
+                    context-type="calculator"
+                    title="ক্যালকুলেটর ভয়েস ইনপুট"
+                    hint='যেমন: "বিক্রি ২৫০০০ টাকা, আলু ১০ কেজি, মুরগি ১৫ কেজি, তেল ৫ লিটার"'
+                    @apply="handleVoiceApply"
                 />
+
+                <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 rounded-xl p-1.5 min-h-[40px]">
+                    <Calendar class="w-4 h-4 text-amber-400 ml-1.5" />
+                    <input
+                        type="date"
+                        v-model="selectedDate"
+                        @change="changeDate"
+                        class="bg-transparent border-none text-xs text-white font-mono focus:outline-none cursor-pointer"
+                    />
+                </div>
             </div>
         </div>
 

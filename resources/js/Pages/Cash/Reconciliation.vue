@@ -35,12 +35,22 @@ const props = defineProps({
 });
 
 const { t, formatCurrency } = useI18n();
+import VoiceInputButton from '../../Components/Voice/VoiceInputButton.vue';
 
 const showWithdrawals = ref(false);
 const showReceipts = ref(false);
 const showFormulaModal = ref(false);
 
 const currentDate = ref(props.selectedDate);
+
+const handleVoiceApply = (parsed) => {
+    if (parsed.counted_closing_cash !== null && parsed.counted_closing_cash !== undefined) {
+        form.counted_closing_cash = parsed.counted_closing_cash;
+    } else if (parsed.amount) {
+        form.counted_closing_cash = parsed.amount;
+    }
+    if (parsed.note) form.notes = parsed.note;
+};
 
 const onDateChange = () => {
     router.get('/cash-reconciliation', { date: currentDate.value }, { preserveState: false });
@@ -176,7 +186,14 @@ const syncToDailySales = () => {
 
                 <!-- Date Picker & Quick Actions -->
                 <div class="flex items-center gap-3">
-                    <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-xl">
+                    <VoiceInputButton
+                        context-type="reconciliation"
+                        title="ক্যাশ ড্রয়ার ভয়েস ইনপুট"
+                        hint='যেমন: "ড্রয়ারে গুনে পেয়েছি ২৫৪০০ টাকা"'
+                        @apply="handleVoiceApply"
+                    />
+
+                    <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-xl min-h-[40px]">
                         <Calendar class="w-4 h-4 text-amber-400" />
                         <input
                             type="date"

@@ -27,6 +27,8 @@ const form = useForm({
 const handleVoiceApply = (parsed) => {
     if (parsed.amount) form.amount = parsed.amount;
     if (parsed.item_name) form.payee = parsed.item_name;
+    if (parsed.category) form.category = parsed.category;
+    if (parsed.payment_account_id) form.payment_account_id = parsed.payment_account_id;
     if (parsed.note) form.notes = parsed.note;
     showModal.value = true;
 };

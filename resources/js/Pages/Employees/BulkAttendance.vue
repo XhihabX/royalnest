@@ -12,6 +12,7 @@ import {
     Clock
 } from 'lucide-vue-next';
 import { useI18n } from '../../Composables/useI18n';
+import VoiceInputButton from '@/Components/Voice/VoiceInputButton.vue';
 
 const props = defineProps({
     employees: Array,
@@ -50,6 +51,19 @@ const form = useForm({
         };
     }),
 });
+
+const handleVoiceApply = (parsed) => {
+    const searchName = (parsed.item_name || parsed.name || '').toLowerCase();
+    if (searchName && form.records) {
+        const target = form.records.find(r => r.name.toLowerCase().includes(searchName))
+            || (parsed.employee_id ? form.records.find(r => r.employee_id === parsed.employee_id) : null);
+        if (target) {
+            if (parsed.attendance_status) target.status = parsed.attendance_status;
+            if (parsed.shift) target.shift = parsed.shift;
+            if (parsed.note) target.notes = parsed.note;
+        }
+    }
+};
 
 const markAll = (st) => {
     form.records.forEach(rec => {
@@ -93,7 +107,14 @@ const submitBulk = () => {
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs">
+                    <VoiceInputButton
+                        context-type="attendance"
+                        title="হাজিরা ভয়েস ইনপুট"
+                        hint='যেমন: "রহিম সকাল শিফট উপস্থিত" বা "করিম নাইট শিফট হাফ ডে"'
+                        @apply="handleVoiceApply"
+                    />
+
+                    <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs min-h-[40px]">
                         <span class="text-slate-400 mr-2 font-medium">Date:</span>
                         <input
                             v-model="attendanceDate"

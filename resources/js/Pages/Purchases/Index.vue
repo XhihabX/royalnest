@@ -35,11 +35,22 @@ const handleVoiceApply = (parsed) => {
     if (parsed.amount) form.paid_amount = parsed.amount;
     if (parsed.note) form.notes = parsed.note;
 
-    if (parsed.product_id) {
-        form.items[0].product_id = parsed.product_id;
+    let pId = parsed.product_id;
+    if (!pId && (parsed.item_name || parsed.name) && props.products) {
+        const searchName = (parsed.item_name || parsed.name).toLowerCase();
+        const found = props.products.find(p => p.name.toLowerCase().includes(searchName))
+            || props.products.find(p => searchName.includes(p.name.toLowerCase()));
+        if (found) pId = found.id;
+    }
+
+    if (pId) {
+        form.items[0].product_id = pId;
+        onProductSelect(0);
         form.items[0].purchase_quantity = parsed.quantity || 1;
-        form.items[0].purchase_unit = parsed.unit || 'kg';
-        if (parsed.amount && parsed.quantity) {
+        if (parsed.unit) form.items[0].purchase_unit = parsed.unit;
+        if (parsed.unit_price) {
+            form.items[0].unit_price = parsed.unit_price;
+        } else if (parsed.amount && parsed.quantity) {
             form.items[0].unit_price = Number((parsed.amount / parsed.quantity).toFixed(2));
         }
     }

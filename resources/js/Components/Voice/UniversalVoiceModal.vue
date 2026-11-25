@@ -10,7 +10,9 @@ import {
     AlertCircle, 
     Sparkles, 
     Edit3,
-    ArrowRight
+    ArrowRight,
+    Plus,
+    Trash2
 } from 'lucide-vue-next';
 import { useVoiceCostParser } from '../../Composables/useVoiceCostParser';
 
@@ -18,7 +20,7 @@ const props = defineProps({
     modelValue: Boolean,
     contextType: {
         type: String,
-        default: 'costs', // costs, purchases, expenses, sales, attendance, employees, suppliers, inventory
+        default: 'costs', // costs, purchases, expenses, sales, attendance, employees, reconciliation, wastage, calculator, consumption
     },
     title: {
         type: String,
@@ -26,7 +28,7 @@ const props = defineProps({
     },
     hint: {
         type: String,
-        default: 'উদাহরণ: "আলু ৫ কেজি ৫০০ টাকা ক্যাশ" বা " রহিম কে ৫০০ টাকা বেতন দিয়েছি"',
+        default: 'উদাহরণ: "আলু ৫ কেজি ৫০০ টাকা ক্যাশ" বা "বিক্রি ২৫০০০ ক্যাশ ২০০০০ বিকাশ ৫০০০"',
     },
 });
 
@@ -60,14 +62,24 @@ const reviewFields = ref({
     employee_id: null,
     payment_account_id: null,
     quantity: null,
-    unit: '',
+    unit: 'kg',
+    unit_price: null,
     amount: null,
+    total_sales: null,
+    cash_sales: null,
+    bkash_sales: null,
+    nagad_sales: null,
+    card_sales: null,
+    other_sales: null,
     shift: 'morning',
     attendance_status: 'present',
+    reason: 'spoiled',
+    category: 'electricity',
+    payment_method: 'cash',
+    counted_closing_cash: null,
+    items: [],
     note: '',
 });
-
-const isConfirmed = ref(false);
 
 // Default to Bengali
 voiceLanguage.value = 'bn-BD';
@@ -94,36 +106,44 @@ const toggleLanguage = () => {
 
 // Process spoken text and match against database
 const processSpokenText = async (rawText) => {
-    const parsed = parseSpokenCost(rawText);
+    const parsed = parseSpokenCost(rawText, props.contextType);
+    if (!parsed) return;
     
     reviewFields.value.amount = parsed.amount || null;
     reviewFields.value.quantity = parsed.quantity || null;
-    reviewFields.value.unit = parsed.unit || '';
+    reviewFields.value.unit = parsed.unit || 'kg';
+    reviewFields.value.unit_price = parsed.unit_price || null;
+    reviewFields.value.item_name = parsed.item_name || parsed.name || '';
     reviewFields.value.note = rawText;
+    reviewFields.value.payment_method = parsed.payment_method || 'cash';
+    reviewFields.value.shift = parsed.shift || 'morning';
+    reviewFields.value.attendance_status = parsed.attendance_status || 'present';
+    reviewFields.value.reason = parsed.reason || 'spoiled';
+    reviewFields.value.category = parsed.expense_category || 'electricity';
+    reviewFields.value.counted_closing_cash = parsed.counted_closing_cash || parsed.amount || null;
 
-    // Detect shift keywords
-    if (/সকাল|মর্নিং|morning/i.test(rawText)) {
-        reviewFields.value.shift = 'morning';
-    } else if (/বিকাল|সন্ধ্যা|ইভনিং|রাত|evening|night/i.test(rawText)) {
-        reviewFields.value.shift = 'evening';
-    }
+    // Sales fields
+    reviewFields.value.total_sales = parsed.total_sales || null;
+    reviewFields.value.cash_sales = parsed.cash_sales || null;
+    reviewFields.value.bkash_sales = parsed.bkash_sales || null;
+    reviewFields.value.nagad_sales = parsed.nagad_sales || null;
+    reviewFields.value.card_sales = parsed.card_sales || null;
+    reviewFields.value.other_sales = parsed.other_sales || null;
 
-    // Detect attendance status
-    if (/অনুপস্থিত|এবসেন্ট|ছুটি|leave|absent/i.test(rawText)) {
-        reviewFields.value.attendance_status = 'absent';
-    } else if (/হাফ|অর্ধেক|half/i.test(rawText)) {
-        reviewFields.value.attendance_status = 'half_day';
+    // Multi-items for consumption / calculator
+    if (parsed.items && parsed.items.length > 0) {
+        reviewFields.value.items = parsed.items.map(it => ({ ...it }));
     } else {
-        reviewFields.value.attendance_status = 'present';
+        reviewFields.value.items = [];
     }
 
     // Query database for fresh matching entities
-    const term = parsed.itemName || parsed.category || rawText.split(' ')[0] || '';
+    const term = parsed.item_name || parsed.name || rawText.split(' ')[0] || '';
     if (term.length >= 2) {
         isSearchingDb.value = true;
         try {
             const lookupType = props.contextType === 'purchases' ? 'purchase_entities' : 
-                               props.contextType === 'attendance' ? 'employees' : 'cost_entities';
+                               (props.contextType === 'attendance' || props.contextType === 'employees') ? 'employees' : 'cost_entities';
             const params = new URLSearchParams({ type: lookupType, q: term });
             const res = await fetch(`/api/voice/lookup?${params.toString()}`, {
                 headers: { 'Accept': 'application/json' }
@@ -169,6 +189,18 @@ const handleManualSubmit = async () => {
         transcript.value = manualTextInput.value.trim();
         await processSpokenText(manualTextInput.value.trim());
     }
+};
+
+const addItemToReviewList = () => {
+    reviewFields.value.items.push({
+        item_name: '',
+        quantity: 1,
+        unit: 'kg',
+    });
+};
+
+const removeItemFromReviewList = (idx) => {
+    reviewFields.value.items.splice(idx, 1);
 };
 
 const handleConfirm = () => {
@@ -268,7 +300,7 @@ const closeModal = () => {
                     </p>
                 </div>
 
-                <!-- Fallback Manual Text Input (if mic unsupported or user prefers typing) -->
+                <!-- Fallback Manual Text Input -->
                 <div v-if="!isSupported || isManualMode" class="space-y-1.5">
                     <label class="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
                         <span>কীবোর্ডে লিখে টেস্ট করুন (Manual Input):</span>
@@ -291,7 +323,7 @@ const closeModal = () => {
                     </div>
                 </div>
 
-                <!-- Interactive Review & Correction Card (Mandatory Safety Step) -->
+                <!-- Interactive Review & Correction Card (Tailored to context) -->
                 <div class="p-4 bg-slate-950/90 rounded-2xl border border-amber-500/30 space-y-3">
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-bold text-amber-400 flex items-center gap-1.5">
@@ -303,8 +335,250 @@ const closeModal = () => {
                         </span>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3 text-xs">
-                        <!-- Item / Person Name -->
+                    <!-- 1. SALES CONTEXT REVIEW -->
+                    <div v-if="contextType === 'sales' || contextType === 'daily_sales'" class="grid grid-cols-2 gap-3 text-xs">
+                        <div class="col-span-2">
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">মোট বিক্রি (Gross Sales ৳):</label>
+                            <input
+                                v-model="reviewFields.total_sales"
+                                type="number"
+                                step="any"
+                                placeholder="৳ 0.00"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-amber-300 font-extrabold text-base focus:border-amber-500"
+                            />
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">ক্যাশ (Cash ৳):</label>
+                            <input
+                                v-model="reviewFields.cash_sales"
+                                type="number"
+                                step="any"
+                                placeholder="৳ 0.00"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:border-amber-500"
+                            />
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">বিকাশ (bKash ৳):</label>
+                            <input
+                                v-model="reviewFields.bkash_sales"
+                                type="number"
+                                step="any"
+                                placeholder="৳ 0.00"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:border-amber-500"
+                            />
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">নগদ (Nagad ৳):</label>
+                            <input
+                                v-model="reviewFields.nagad_sales"
+                                type="number"
+                                step="any"
+                                placeholder="৳ 0.00"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:border-amber-500"
+                            />
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">কার্ড/ব্যাংক (Card ৳):</label>
+                            <input
+                                v-model="reviewFields.card_sales"
+                                type="number"
+                                step="any"
+                                placeholder="৳ 0.00"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:border-amber-500"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- 2. ATTENDANCE CONTEXT REVIEW -->
+                    <div v-else-if="contextType === 'attendance' || contextType === 'employees'" class="grid grid-cols-2 gap-3 text-xs">
+                        <div class="col-span-2">
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">কর্মীর নাম (Staff Name):</label>
+                            <input
+                                v-model="reviewFields.item_name"
+                                type="text"
+                                placeholder="যেমন: রহিম, করিম"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:border-amber-500"
+                            />
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">শিফট (Shift):</label>
+                            <select
+                                v-model="reviewFields.shift"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:border-amber-500"
+                            >
+                                <option value="morning">সকাল (Morning)</option>
+                                <option value="evening">বিকাল/রাত (Evening)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">উপস্থিতি স্ট্যাটাস (Status):</label>
+                            <select
+                                v-model="reviewFields.attendance_status"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:border-amber-500"
+                            >
+                                <option value="present">উপস্থিত (Present)</option>
+                                <option value="half_day">হাফ ডে (Half Day)</option>
+                                <option value="absent">অনুপস্থিত (Absent)</option>
+                                <option value="leave">ছুটি (Leave)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 3. RECONCILIATION CONTEXT REVIEW -->
+                    <div v-else-if="contextType === 'reconciliation' || contextType === 'cash'" class="space-y-3 text-xs">
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">গুনে পাওয়া নগদ টাকা (Physical Counted Cash ৳):</label>
+                            <input
+                                v-model="reviewFields.counted_closing_cash"
+                                type="number"
+                                step="any"
+                                placeholder="৳ 0.00"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-amber-300 font-extrabold text-lg focus:border-amber-500"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- 4. WASTAGE CONTEXT REVIEW -->
+                    <div v-else-if="contextType === 'wastage'" class="grid grid-cols-2 gap-3 text-xs">
+                        <div class="col-span-2">
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">নষ্ট হওয়া উপাদান (Ingredient Name):</label>
+                            <input
+                                v-model="reviewFields.item_name"
+                                type="text"
+                                placeholder="যেমন: টমেটো, মুরগি, দুধ"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:border-amber-500"
+                            />
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">পরিমাণ (Quantity):</label>
+                            <input
+                                v-model="reviewFields.quantity"
+                                type="number"
+                                step="any"
+                                placeholder="0"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:border-amber-500"
+                            />
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">একক (Unit):</label>
+                            <input
+                                v-model="reviewFields.unit"
+                                type="text"
+                                placeholder="kg, pcs, L"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:border-amber-500"
+                            />
+                        </div>
+                        <div class="col-span-2">
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">কারণ (Reason):</label>
+                            <select
+                                v-model="reviewFields.reason"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:border-amber-500"
+                            >
+                                <option value="spoiled">পচে গেছে (Spoiled)</option>
+                                <option value="expired">মেয়াদ শেষ (Expired)</option>
+                                <option value="burnt">পুড়ে গেছে (Burnt/Overcooked)</option>
+                                <option value="damaged">ভেঙে/নষ্ট হয়েছে (Damaged)</option>
+                                <option value="other">অন্যান্য (Other)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 5. EXPENSES CONTEXT REVIEW -->
+                    <div v-else-if="contextType === 'expenses'" class="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">খরচের খাত (Category):</label>
+                            <select
+                                v-model="reviewFields.category"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:border-amber-500"
+                            >
+                                <option value="electricity">বিদ্যুৎ বিল (Electricity)</option>
+                                <option value="gas">গ্যাস বিল (Gas)</option>
+                                <option value="rent">দোকান ভাড়া (Rent)</option>
+                                <option value="cleaning">পরিচ্ছন্নতা (Cleaning)</option>
+                                <option value="transport">যাতায়াত (Transport)</option>
+                                <option value="repairs">মেরামত (Repairs)</option>
+                                <option value="internet">ইন্টারনেট (Internet)</option>
+                                <option value="misc">অন্যান্য (Misc)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">টাকার পরিমাণ (Amount ৳):</label>
+                            <input
+                                v-model="reviewFields.amount"
+                                type="number"
+                                step="any"
+                                placeholder="৳ 0.00"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-amber-300 font-extrabold text-base focus:border-amber-500"
+                            />
+                        </div>
+                        <div class="col-span-2">
+                            <label class="text-[10px] font-semibold text-slate-400 block mb-1">প্রাপক / বিবরণ (Payee / Description):</label>
+                            <input
+                                v-model="reviewFields.item_name"
+                                type="text"
+                                placeholder="যেমন: পল্লি বিদ্যুৎ, বাড়িওয়ালা"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:border-amber-500"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- 6. CALCULATOR / CONSUMPTION (Items List) REVIEW -->
+                    <div v-else-if="(contextType === 'calculator' || contextType === 'consumption') && reviewFields.items && reviewFields.items.length > 0" class="space-y-2 text-xs">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[10px] font-semibold text-slate-400">সনাক্তকৃত উপাদান তালিকা (Detected Ingredients):</label>
+                            <button
+                                type="button"
+                                @click="addItemToReviewList"
+                                class="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
+                            >
+                                <Plus class="w-3 h-3" />
+                                <span>আইটেম যোগ করুন</span>
+                            </button>
+                        </div>
+
+                        <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            <div 
+                                v-for="(it, idx) in reviewFields.items" 
+                                :key="idx" 
+                                class="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800"
+                            >
+                                <input
+                                    v-model="it.item_name"
+                                    type="text"
+                                    placeholder="উপাদান"
+                                    class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-white font-medium text-xs focus:border-amber-500"
+                                />
+                                <input
+                                    v-model="it.quantity"
+                                    type="number"
+                                    step="any"
+                                    placeholder="পরিমাণ"
+                                    class="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-white font-bold text-xs text-right focus:border-amber-500"
+                                />
+                                <input
+                                    v-model="it.unit"
+                                    type="text"
+                                    placeholder="একক"
+                                    class="w-14 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-300 text-xs focus:border-amber-500"
+                                />
+                                <button
+                                    type="button"
+                                    @click="removeItemFromReviewList(idx)"
+                                    class="text-rose-400 hover:text-rose-300 p-1"
+                                >
+                                    <Trash2 class="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div v-if="reviewFields.total_sales" class="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between">
+                            <span class="text-[11px] text-slate-400">শনাক্তকৃত মোট বিক্রি:</span>
+                            <span class="text-xs font-bold text-amber-300">৳ {{ reviewFields.total_sales }}</span>
+                        </div>
+                    </div>
+
+                    <!-- 7. DEFAULT / PURCHASES / GENERAL COSTS REVIEW -->
+                    <div v-else class="grid grid-cols-2 gap-3 text-xs">
                         <div class="col-span-2">
                             <label class="text-[10px] font-semibold text-slate-400 block mb-1">
                                 আইটেম / ব্যক্তি / খাত (Item / Payee):
@@ -317,7 +591,6 @@ const closeModal = () => {
                             />
                         </div>
 
-                        <!-- Quantity -->
                         <div>
                             <label class="text-[10px] font-semibold text-slate-400 block mb-1">
                                 পরিমাণ (Quantity):
@@ -331,7 +604,6 @@ const closeModal = () => {
                             />
                         </div>
 
-                        <!-- Unit -->
                         <div>
                             <label class="text-[10px] font-semibold text-slate-400 block mb-1">
                                 একক (Unit):
@@ -344,7 +616,6 @@ const closeModal = () => {
                             />
                         </div>
 
-                        <!-- Amount -->
                         <div class="col-span-2">
                             <label class="text-[10px] font-semibold text-slate-400 block mb-1">
                                 টাকার পরিমাণ (Amount ৳):
@@ -388,4 +659,3 @@ const closeModal = () => {
         </div>
     </div>
 </template>
-
