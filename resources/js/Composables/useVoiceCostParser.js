@@ -253,49 +253,51 @@ export function useVoiceCostParser() {
     if (context === 'sales' || context === 'daily_sales') {
       result.transaction_type = 'sales';
 
-      // Look for individual breakdown channels
+      // Look for individual breakdown channels with boundary lookahead
       // Cash
-      const cashMatch = text.match(/(?:ক্যাশ|নগদ ক্যাশ|cash)\s*([^\s,]+(?:\s+[^\s,]+)?)(?:\s*টাকা)?/i);
+      const cashMatch = text.match(/(?:ক্যাশ|নগদ ক্যাশ|cash)\s*([^,]+?)(?=(?:বিকাশ|নগদ|কার্ড|ব্যাংক|অন্যান্য|টাকা|$))/i);
       if (cashMatch) {
-        result.cash_sales = parseNumber(cashMatch[1]);
+        result.cash_sales = parseNumber(cashMatch[1].trim());
       }
 
       // bKash
-      const bkashMatch = text.match(/(?:বিকাশ|bkash)\s*([^\s,]+(?:\s+[^\s,]+)?)(?:\s*টাকা)?/i);
+      const bkashMatch = text.match(/(?:বিকাশ|bkash)\s*([^,]+?)(?=(?:ক্যাশ|নগদ|কার্ড|ব্যাংক|অন্যান্য|টাকা|$))/i);
       if (bkashMatch) {
-        result.bkash_sales = parseNumber(bkashMatch[1]);
+        result.bkash_sales = parseNumber(bkashMatch[1].trim());
       }
 
       // Nagad
-      const nagadMatch = text.match(/(?:নগদ|nagad)\s*([^\s,]+(?:\s+[^\s,]+)?)(?:\s*টাকা)?/i);
-      if (nagadMatch && !text.includes('নগদ ক্যাশ') && result.cash_sales !== null) {
-        result.nagad_sales = parseNumber(nagadMatch[1]);
+      const nagadMatch = text.match(/(?:নগদ|nagad)\s*([^,]+?)(?=(?:ক্যাশ|বিকাশ|কার্ড|ব্যাংক|অন্যান্য|টাকা|$))/i);
+      if (nagadMatch && !text.includes('নগদ ক্যাশ')) {
+        result.nagad_sales = parseNumber(nagadMatch[1].trim());
       }
 
       // Card / Bank
-      const cardMatch = text.match(/(?:কার্ড|ব্যাংক|card|bank)\s*([^\s,]+(?:\s+[^\s,]+)?)(?:\s*টাকা)?/i);
+      const cardMatch = text.match(/(?:কার্ড|ব্যাংক|card|bank)\s*([^,]+?)(?=(?:ক্যাশ|বিকাশ|নগদ|অন্যান্য|টাকা|$))/i);
       if (cardMatch) {
-        result.card_sales = parseNumber(cardMatch[1]);
+        result.card_sales = parseNumber(cardMatch[1].trim());
       }
 
       // Other
-      const otherMatch = text.match(/(?:অন্যান্য|other)\s*([^\s,]+(?:\s+[^\s,]+)?)(?:\s*টাকা)?/i);
+      const otherMatch = text.match(/(?:অন্যান্য|other)\s*([^,]+?)(?=(?:ক্যাশ|বিকাশ|নগদ|কার্ড|টাকা|$))/i);
       if (otherMatch) {
-        result.other_sales = parseNumber(otherMatch[1]);
+        result.other_sales = parseNumber(otherMatch[1].trim());
       }
 
       // Total Sales
-      const totalMatch = text.match(/(?:মোট\s*বিক্রি|টোটাল\s*বিক্রি|মোট\s*সেলস|টোটাল|total\s*sales|total)\s*([^\s,]+(?:\s+[^\s,]+)?)(?:\s*টাকা)?/i);
+      const totalMatch = text.match(/(?:মোট\s*বিক্রি|টোটাল\s*বিক্রি|মোট\s*সেলস|টোটাল|total\s*sales|total)\s*([^,]+?)(?=(?:ক্যাশ|বিকাশ|নগদ|কার্ড|ব্যাংক|অন্যান্য|টাকা|$))/i);
       if (totalMatch) {
-        result.total_sales = parseNumber(totalMatch[1]);
+        result.total_sales = parseNumber(totalMatch[1].trim());
       } else {
-        // If single number mentioned like "আজকের বিক্রি ২৫০০০ টাকা"
-        const singleMatch = text.match(/([^\s,]+(?:\s+[^\s,]+)?)\s*টাকা/i);
+        // If single number mentioned like "আজকের বিক্রি ২৫০০০ টাকা" or "বিক্রি ২৫০০০"
+        const singleMatch = text.match(/(?:বিক্রি|সেলস|sales)?\s*([^\s,]+(?:\s+[^\s,]+)?)\s*(?:টাকা)?$/i);
         if (singleMatch) {
           const val = parseNumber(singleMatch[1]);
-          result.total_sales = val;
-          if (!result.cash_sales && !result.bkash_sales && !result.nagad_sales && !result.card_sales) {
-            result.cash_sales = val;
+          if (val) {
+            result.total_sales = val;
+            if (!result.cash_sales && !result.bkash_sales && !result.nagad_sales && !result.card_sales) {
+              result.cash_sales = val;
+            }
           }
         }
       }
@@ -316,37 +318,61 @@ export function useVoiceCostParser() {
       result.transaction_type = 'consumption';
 
       // Check if sales total is also mentioned
-      const salesMatch = text.match(/(?:বিক্রি|সেলস|sales)\s*([^\s,]+(?:\s+[^\s,]+)?)\s*টাকা/i);
+      const salesMatch = text.match(/(?:বিক্রি|সেলস|sales)\s*([^\s,]+(?:\s+[^\s,]+)?)\s*(?:টাকা)?/i);
       if (salesMatch) {
         result.total_sales = parseNumber(salesMatch[1]);
       }
 
-      // Split multiple items by comma, 'এবং', 'ও', 'আর'
-      const segments = text.split(/[,،\n]|এবং|ও|আর/);
+      // Normalize digits in text for regex
+      let normalizedText = text;
+      for (const [bn, en] of Object.entries(bnDigitMap)) {
+        normalizedText = normalizedText.replaceAll(bn, en);
+      }
+
       const parsedItems = [];
 
-      for (const seg of segments) {
-        const s = seg.trim();
-        if (!s || s.includes('বিক্রি') || s.includes('সেলস')) continue;
-
-        const unit = extractUnit(s);
-        // Match: [item] [qty] [unit] or [qty] [unit] [item]
-        const qtyMatch = s.match(/([^\s]+(?:\s+[^\s]+)?)\s*(?:কেজি|গ্রাম|লিটার|পিস|টি|টা|বস্তা|প্যাকেট|kg|liter|pcs)/i);
-        const qty = qtyMatch ? parseNumber(qtyMatch[1]) : null;
-
-        let itemName = s
-          .replace(/(?:কেজি|গ্রাম|লিটার|পিস|টি|টা|বস্তা|প্যাকেট|kg|liter|pcs)/gi, '')
-          .replace(/(\d+(?:\.\d+)?)/g, '')
-          .replace(/(?:আজকে|মোট|খরচ|লেগেছে|ব্যবহার|হয়েছে|হয়েছে)/gi, '')
+      // 1. First try continuous regex: [item] [qty] [unit]
+      const continuousRegex = /([^\d\s,]+)\s*(\d+(?:\.\d+)?)\s*(কেজি|গ্রাম|লিটার|পিস|টি|টা|বস্তা|প্যাকেট|kg|liter|pcs)/gi;
+      let cMatch;
+      while ((cMatch = continuousRegex.exec(normalizedText)) !== null) {
+        const rawName = cMatch[1]
+          .replace(/(?:আজকে|মোট|খরচ|লেগেছে|ব্যবহার|হয়েছে|হয়ে|কিনেছি|দর)/gi, '')
           .trim();
-
-        if (itemName && qty) {
+        if (rawName && !rawName.includes('বিক্রি') && !rawName.includes('সেলস')) {
           parsedItems.push({
-            item_name: itemName,
-            quantity: qty,
-            unit: unit,
-            notes: s,
+            item_name: rawName,
+            quantity: parseFloat(cMatch[2]),
+            unit: extractUnit(cMatch[3]),
+            notes: cMatch[0],
           });
+        }
+      }
+
+      // 2. If continuous regex didn't find items, fallback to segment splitting
+      if (parsedItems.length === 0) {
+        const segments = text.split(/[,،\n]|এবং|ও|আর/);
+        for (const seg of segments) {
+          const s = seg.trim();
+          if (!s || s.includes('বিক্রি') || s.includes('সেলস')) continue;
+
+          const unit = extractUnit(s);
+          const qtyMatch = s.match(/([^\s]+(?:\s+[^\s]+)?)\s*(?:কেজি|গ্রাম|লিটার|পিস|টি|টা|বস্তা|প্যাকেট|kg|liter|pcs)/i);
+          const qty = qtyMatch ? parseNumber(qtyMatch[1]) : null;
+
+          let itemName = s
+            .replace(/(?:কেজি|গ্রাম|লিটার|পিস|টি|টা|বস্তা|প্যাকেট|kg|liter|pcs)/gi, '')
+            .replace(/(\d+(?:\.\d+)?)/g, '')
+            .replace(/(?:আজকে|মোট|খরচ|লেগেছে|ব্যবহার|হয়েছে|হয়ে)/gi, '')
+            .trim();
+
+          if (itemName && qty) {
+            parsedItems.push({
+              item_name: itemName,
+              quantity: qty,
+              unit: unit,
+              notes: s,
+            });
+          }
         }
       }
 
