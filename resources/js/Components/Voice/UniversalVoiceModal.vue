@@ -282,8 +282,17 @@ const closeModal = () => {
                         ></span>
                     </button>
 
-                    <p class="text-xs font-semibold mt-3" :class="isListening ? 'text-rose-400' : 'text-slate-300'">
-                        {{ isListening ? 'শুনছি... কথা বলুন' : 'কথা বলতে মাইকে চাপ দিন' }}
+                    <!-- Animated Audio Waveform when Listening -->
+                    <div v-if="isListening" class="flex items-center gap-1.5 mt-3">
+                        <span class="w-1 h-3 bg-amber-400 rounded-full animate-pulse"></span>
+                        <span class="w-1 h-6 bg-amber-300 rounded-full animate-bounce"></span>
+                        <span class="w-1 h-8 bg-amber-400 rounded-full animate-pulse"></span>
+                        <span class="w-1 h-5 bg-amber-300 rounded-full animate-bounce"></span>
+                        <span class="w-1 h-3 bg-amber-400 rounded-full animate-pulse"></span>
+                    </div>
+
+                    <p class="text-xs font-semibold mt-2" :class="isListening ? 'text-amber-300' : 'text-slate-300'">
+                        {{ isListening ? '🎙️ শুনছি... স্পষ্ট করে কথা বলুন' : 'কথা বলতে মাইকে চাপ দিন' }}
                     </p>
                     <p class="text-[11px] text-slate-400 mt-1 text-center px-4 max-w-sm">
                         {{ hint }}

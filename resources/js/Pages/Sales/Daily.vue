@@ -77,19 +77,32 @@ const submit = () => {
 
 <template>
     <AppLayout title="Daily Sales & Income">
+        <!-- Top Page Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <div>
+                <h1 class="text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                    <ShoppingBag class="w-6 h-6 text-emerald-400" />
+                    <span>{{ t('daily_sales', 'দৈনিক বিক্রয় ও আয় এন্ট্রি') }}</span>
+                </h1>
+                <p class="text-xs text-slate-400 mt-1">
+                    ক্যাশ, বিকাশ, নগদ ও কার্ড বিক্রয় সমন্বয় এবং অটোমেটেড অডিট হিস্টোরি
+                </p>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left 1 Col: Daily Sales Input Form -->
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl">
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center space-x-2">
                         <ShoppingBag class="w-5 h-5 text-amber-400" />
-                        <h2 class="text-base font-bold text-white">{{ t('record_daily_sales', 'Record Daily Sales') }}</h2>
+                        <h2 class="text-base font-bold text-white">{{ t('record_daily_sales', 'নতুন বিক্রয় এন্ট্রি') }}</h2>
                     </div>
 
                     <VoiceInputButton
                         context-type="sales"
                         title="বিক্রয় ভয়েস টাইপিং"
-                        hint='যেমন: "আজকে ক্যাশ বিক্রয় ৮৫০০ টাকা"'
+                        hint='যেমন: "মোট বিক্রি ২৫০০০ টাকা, ক্যাশ ২০০০০, বিকাশ ৫০০০"'
                         @apply="handleVoiceApply"
                     />
                 </div>
@@ -223,7 +236,7 @@ const submit = () => {
             </div>
 
             <!-- Right 2 Cols: Sales History -->
-            <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <div class="lg:col-span-2 bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl">
                 <h2 class="text-base font-bold text-white mb-4">Historical Daily Sales</h2>
 
                 <div class="overflow-x-auto">
